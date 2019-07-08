@@ -26,7 +26,8 @@ def run_cv_all_goterms(alg_runners, ann_obj, folds=5, num_reps=1, cv_seed=None, 
     """
     ann_matrix = ann_obj.ann_matrix
     goids, prots = ann_obj.goids, ann_obj.prots
-
+    
+    #run_obj.orig_ann = ann_matrix
     # set the cv_seed if specified
     # 2019-06-26 BUG: If there are a different number of terms, or the order of the terms changed, then the results won't be the same
     #if cv_seed is not None:
@@ -35,7 +36,7 @@ def run_cv_all_goterms(alg_runners, ann_obj, folds=5, num_reps=1, cv_seed=None, 
 
     # first check to see if the algorithms have already been run
     # and if the results should be overwritten
-    if kwargs['forcealg'] is True or len(goids) == 1:
+    if kwargs['forcealg'] is True:
         # runners_to_run is a list of runners for each repitition
         runners_to_run = {i: alg_runners for i in range(1,num_reps+1)}
     else:
@@ -48,6 +49,7 @@ def run_cv_all_goterms(alg_runners, ann_obj, folds=5, num_reps=1, cv_seed=None, 
                 # add the current repitition number to the seed
                 curr_seed += rep-1
             for run_obj in alg_runners:
+                run_obj.orig_ann = ann_matrix
                 out_file = "%s/cv-%dfolds-rep%d%s%s.txt" % (
                     run_obj.out_dir, folds, rep,
                     "-seed%s"%curr_seed if curr_seed is not None else "", run_obj.params_str)
@@ -71,6 +73,7 @@ def run_cv_all_goterms(alg_runners, ann_obj, folds=5, num_reps=1, cv_seed=None, 
         for run_obj in runners_to_run[rep]:
             # because each fold contains a different set of positives, and combined they contain all positives,
             # store all of the prediction scores from each fold in a matrix
+            run_obj.orig_ann = ann_matrix
             combined_fold_scores = sparse.lil_matrix(ann_matrix.shape, dtype=np.float)
             for curr_fold, (train_ann_mat, test_ann_mat) in enumerate(ann_matrix_folds):
                 print("*  "*20)

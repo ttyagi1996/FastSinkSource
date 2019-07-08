@@ -11,10 +11,10 @@ from src.algorithms.aptrank_birgrank.birgrank import birgRank
 import src.algorithms.aptrank_birgrank.run_birgrank as run_birgrank
 import src.algorithms.ranks_runner as ranks
 import src.algorithms.hemdag_runner as hemdag
-#import src.algorithms.sanity_hemdag as sanity
+import src.algorithms.sanity_hemdag as sanity
 import src.algorithms.svm_runner as svm
 import src.algorithms.digraph_fss_runner as digraph_fss
-#import src.algorithms.semantic_similarity_runner as itss
+import src.algorithms.semantic_similarity_runner as itss
 import numpy as np
 from scipy import sparse
 
@@ -26,10 +26,10 @@ LibMapper = {
     'birgrank': birgrank,
     'ranks' : ranks,
     'hemdag' : hemdag,
-    #'sanity' : sanity,
+    'sanity' : sanity,
     'svm' : svm,
     'digraph_fss' : digraph_fss,
-    #'itss' : itss,
+    'itss' : itss,
 }
 
 

@@ -6,7 +6,8 @@ import numpy as np
 from collections import defaultdict
 import time
 from tqdm import tqdm
-import src.utils.file_utils as utils
+sys.path.append("src")
+import utils.file_utils as utils
 
 
 ALGORITHMS = [
@@ -75,11 +76,17 @@ def parse_pos_neg_files(pos_neg_files, goterms=None):
     # get the positives and negatives from the matrix
     all_goid_prots = {}
     all_goid_neg = {}
-    for pos_neg_file in pos_neg_files:
-        #goid_prots, goid_neg = self.parse_pos_neg_matrix(self.pos_neg_file)
-        goid_prots, goid_neg = parse_pos_neg_file(pos_neg_file, goterms=goterms)
-        all_goid_prots.update(goid_prots)
-        all_goid_neg.update(goid_neg)
+    if len(pos_neg_files) == 1 and pos_neg_files[0] == '-':
+        print("Using GAIN annotations instead of pos_neg_file")
+        # TODO compare the predictions made by GAIN and my implementation
+        all_goid_prots = parse_gain_file(f_settings.GOA_ALL_FUN_FILE_NOIEA)
+        all_goid_neg = {goid: set() for goid in all_goid_prots} 
+    else:
+        for pos_neg_file in pos_neg_files:
+            #goid_prots, goid_neg = self.parse_pos_neg_matrix(self.pos_neg_file)
+            goid_prots, goid_neg = parse_pos_neg_file(pos_neg_file, goterms=goterms)
+            all_goid_prots.update(goid_prots)
+            all_goid_neg.update(goid_neg)
 
     return all_goid_prots, all_goid_neg
 
@@ -227,20 +234,47 @@ def get_goid_pos_neg(ann_matrix, i):
 
 
 def setup_fixed_scores(P, positives, negatives=None, a=1, 
-        remove_nonreachable=True, verbose=False):
+        remove_nonreachable=True, verbose=False, scores=None):
     """
     Remove the positive and negative nodes from the matrix P 
     and compute the fixed vector f which contains the score contribution 
     of the positive nodes to the unknown nodes.
     """
+    '''
+    if(scores is not None):
+        print("Checking scores")
+        print(scores)
+        print(scores.shape)
+    
+    '''
     #print("Initializing scores and setting up network")
     pos_vec = np.zeros(P.shape[0])
     pos_vec[positives] = 1
     #if negatives is not None:
     #    pos_vec[negatives] = -1
 
+    
     # f contains the fixed amount of score coming from positive nodes
-    f = a*csr_matrix.dot(P, pos_vec)
+    f = a*csr_matrix.dot(P, pos_vec) 
+
+    
+    # use the normalized parent scores and add them to the f vector.
+    # NOTE: the positive and negative nodes get pruned out later in the code, so it doesn't matter if the parent score 
+    #   of all genes node are added to the f vector
+    
+    if scores is not None:
+        assert len(f) == len(scores), "Shape of the fixed vector and scores don't match"
+
+        for i in range(f.shape[0]):
+            #print(f[i], scores[i])
+            f[i] = f[i] + scores[i]
+    '''
+    print("*********Checking shapes************")
+    print("P's shape: %s %s" %(P.shape[0], P.shape[1]))
+    print("pos_vec shape: %s" %(pos_vec.size))
+    print("f vectors shape: %s" %(f.shape))
+    print(f) 
+    '''
 
     if remove_nonreachable is True:
         node2idx, idx2node = {}, {}
