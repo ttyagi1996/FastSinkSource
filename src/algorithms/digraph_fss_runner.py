@@ -290,18 +290,11 @@ def run(run_obj):
         
 
         # update the P (adjacency matrix) to alter the weights of the edges due to the effect of adding a weight of "w" from each node to itself
-        # NOTE: this is now obtained in the setupinput params function, assuming that the weight of every edges carrying a parent score is 1
-        # this will need to be made into a function when considering the weight of a score carrying edge to be the probability.
+       
 
         new_P = run_obj.Pchild
         
-        # update the parent scores to be normalized by the degree obtained by considering the notion of adding an edge of weight 1 that represent the parent score
-
-        # get the degree from the function defined above: compute_degree
-        # this will have to be removed/changed to enable code reuse
-        #print(degree)
-        #deg = compute_degree(run_obj.child_W, degree).toarray().flatten()
-    
+        # update the parent scores to be normalized by the degree obtained by considering the notion of adding an edge of weight 'w' that represent the parent score
         # now multiply the parent scores by this weighted degree
         # the scores will then be added to the fixed score vector "f" computed in alg_utils
 
