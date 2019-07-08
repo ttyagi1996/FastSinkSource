@@ -128,6 +128,8 @@ def setUpPair(run_obj, ss_lambda, calculate_weight=False, child=None, parent=Non
 
     # calculate weight based on the number of annotations of the child and parent pair
     elif calculate_weight==True:
+
+        # calculate the weight of score carrying edge depending on the number of annotations in the parent and child terms
         weight = update_degree(run_obj, child, parent)
         degree=weight
         get_new_adj_matrix(run_obj, ss_lambda=weight)
@@ -166,6 +168,8 @@ def run(run_obj):
 
     degree_pair = {}
 
+    # TODO: add the file to the config file and use that
+    # this file contains the child-parent pairs along with a weight containing the itss score
     with open("./data/itss-child_parent.csv", "r") as f:
         #with open("./data/bpln-child_parent.csv", "r") as f:
         reader = csv.reader(f, delimiter=',')
@@ -185,7 +189,7 @@ def run(run_obj):
     # this is done since some terms are only parents, and thus are not handled during the parent-child run
     only_parents = list(set(par)-set(child))
     
-    
+    # if a prespecified weight is to be used for edges for all hpo term pairs
     if params['itss_scores'] == False and params['frac_ann_scores'] == False:
         degree, deg = setUpPair(run_obj, ss_lambda=run_obj.params.get('weight', None))
 
@@ -198,9 +202,6 @@ def run(run_obj):
         
         # store the parent of the given child term
         parent = pairs[c]
-        
-        #For sanity check, set the parent of the child to be the child itself
-        #parent = c
 
         # store the goids of the parent and child terms
         goid_par = run_obj.goids[parent]
@@ -208,37 +209,18 @@ def run(run_obj):
 
         print(goid_child, goid_par)
         
-
-
-        # for a given parent-child pair, find the weight of the edges from the parent term to the child term
-        # the weight of this edge is computed as a fraction of the number of positive annotations in the child terms and the positive ann in the parent
-        # this works, since all the positive annotations of the child term are present in the parent term as well
-        #degree = update_degree(run_obj, c, parent, identical_weight=0)
-        #print(degree)
-
-        # need to get the updated degree of the network for a given weight
-        # if the weight is supposed to be according to itss then get from the dict
-        # else get from weights specified in the config file
-        # or from the frac of annotations
+        
+        # if itss scores are to be used then degree_pair[c] is to be used as the weight of an edge
 
         if params['itss_scores'] == True:
             degree, deg = setUpPair(run_obj, ss_lambda=degree_pair[c])
+
+        # calculate weight of edge using the fraction of proteins annotated to the child and the number of proteins annotated to parent
         elif params['frac_ann_scores'] == True:
             degree, deg = setUpPair(run_obj, ss_lambda = None, calculate_weight = True, child=c, parent=parent)
         #else:
         #    degree, deg = setUpPair(run_obj, ss_lambda=run_obj.params.get('weight', None))
 
-
-        # use the degree which is the itss measure
-        #NOTE: resuls drop by using this measure
-        #degree = degree_pair[c]
-        
-        # using an equal weight of 1 for all score carrying edges between all HPO pairs
-        #degree = 1
-
-        # using this new degree per node, update the normalized adjacency matrix
-        # get_new_adj_matrix(run_obj, ss_lambda = degree) #alg_utils.normalizeGraphEdgeWeights(run_obj.net_obj.W, ss_lambda=degree)
-        
         
         # get positive and negative indices for the parent terms using the pos/neg dictionary constructed above
         # NOTE: the parent terms annotations for cross validation come from the full annotation matrix 
@@ -306,14 +288,8 @@ def run(run_obj):
         tqdm.write("\t%s Parent Term converged after %d iterations " % (alg, iters) +
                 "(%0.4f sec) for %s" % (process_time, goid_par))
         
-        # if the parent term is never a child term (the score wont be altered later), then store the scores in the matrix
-        # this happens only if the ann of parent depends on all children
-        '''
-        if parent in only_parents:
-            goid_scores[parent] = parent_scores
-        '''
 
-        # update the P (adjacency matrix) to alter the weights of the edges due to the effect of adding a weight of "1" from each node to itself
+        # update the P (adjacency matrix) to alter the weights of the edges due to the effect of adding a weight of "w" from each node to itself
         # NOTE: this is now obtained in the setupinput params function, assuming that the weight of every edges carrying a parent score is 1
         # this will need to be made into a function when considering the weight of a score carrying edge to be the probability.
 
@@ -328,25 +304,10 @@ def run(run_obj):
     
         # now multiply the parent scores by this weighted degree
         # the scores will then be added to the fixed score vector "f" computed in alg_utils
-        # NOTE:can be converted to a csr_matrix operation
-        ''' 
-        if params['weight'] == 0: 
-            for i in range(P.shape[0]):
-                new = new_P[i,:].toarray().flatten()
-                old = P[i,:].toarray().flatten()
-                assert all(new == (old)), "New adjacency not same as old"
-        else:
-            for i in range(P.shape[0]):
-                new = new_P[i,:].toarray().flatten()
-                old = P[i,:].toarray().flatten()
-                assert all(new != old), "New adjacency same as the old one"
-
-        '''
 
         for i in range(len(parent_scores)):
             #print(parent_scores[i], deg[i], degree)
             parent_scores[i] = parent_scores[i]*deg[i]*degree
-            #print(parent_scores)
 
         
 
@@ -362,13 +323,6 @@ def run(run_obj):
         tqdm.write("\t%s Child term converged after %d iterations " % (alg, iters) +
                 "(%0.4f sec) for %s" % (process_time, goid_child))
         
-        '''
-        for i in range(scores.shape[0]):
-            #print("Gene: {}" .format(run_obj.prots[i]))
-            print(scores[i], parent_scores[i])
-            assert(scores[i] <= parent_scores[i]), "Hierarchicial Inconsistency for Child: {}, Parent: {}, at Gene: {}".format(
-                    run_obj.goids[c], run_obj.goids[parent], run_obj.prots[i])
-        '''
         # store the scores of the child term in the matrix
         goid_scores[c] = scores
    
