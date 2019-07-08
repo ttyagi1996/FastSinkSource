@@ -173,7 +173,7 @@ def run(run_obj):
 
     # TODO: add the file to the config file and use that
     # this file contains the child-parent pairs along with a weight containing the itss score
-    with open("./data/itss-child_parent.csv", "r") as f:
+    with open(params['matchings_file'], "r") as f:
         reader = csv.reader(f, delimiter=',')
         for row in reader:
             pairs[hpoidx[row[0]]] = hpoidx[row[1]]
@@ -185,7 +185,7 @@ def run(run_obj):
      
     # used later to add the scores of the parent terms to the matrix
     # this is done since some terms are only parents, and thus are not handled during the parent-child run
-    # NOTE: incase of GO-HPO matching, this needs to be commented out/ removed
+
     if params['matching_hpo']:
         only_parents = list(set(par)-set(child))
     
