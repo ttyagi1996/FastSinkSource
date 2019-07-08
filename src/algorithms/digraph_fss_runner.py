@@ -154,11 +154,10 @@ def run(run_obj):
     a, eps, max_iters = params['alpha'], float(params['eps']), params['max_iters']
     
     
-
+    # this contains the full annotation matrix for the hpo terms 
     orig_ann = run_obj.orig_ann
     
-    assert not(np.array_equal(orig_ann.toarray(), run_obj.ann_matrix.toarray())), "The complete annotation matrix and fold matrix are the same!"
- 
+     
     # Read the child-parent pairs from the csv file and construct a dictionary where the keys are the child nodes
     
     pairs = {}
@@ -171,7 +170,6 @@ def run(run_obj):
     # TODO: add the file to the config file and use that
     # this file contains the child-parent pairs along with a weight containing the itss score
     with open("./data/itss-child_parent.csv", "r") as f:
-        #with open("./data/bpln-child_parent.csv", "r") as f:
         reader = csv.reader(f, delimiter=',')
         for row in reader:
             pairs[hpoidx[row[0]]] = hpoidx[row[1]]
@@ -179,14 +177,15 @@ def run(run_obj):
             par.append(hpoidx[row[1]])
             degree_pair[hpoidx[row[0]]] = float(row[2])
 
-    print("Number of children terms constructed: {}" .format(len(pairs)))
+    #print("Number of children terms constructed: {}" .format(len(pairs)))
     
-    print("Number of nodes that are only parents: {}" .format(len(set(par) - set(child))))
+    #print("Number of nodes that are only parents: {}" .format(len(set(par) - set(child))))
 
     assert len(pairs) == run_obj.ann_matrix.shape[0]- (len(set(par) - set(child))), "Number of modified children scores not the same as number of children in pairs"
     
     # used later to add the scores of the parent terms to the matrix
     # this is done since some terms are only parents, and thus are not handled during the parent-child run
+    # NOTE: incase of GO-HPO matching, this needs to be commented out/ removed
     only_parents = list(set(par)-set(child))
     
     # if a prespecified weight is to be used for edges for all hpo term pairs
@@ -218,9 +217,7 @@ def run(run_obj):
         # calculate weight of edge using the fraction of proteins annotated to the child and the number of proteins annotated to parent
         elif params['frac_ann_scores'] == True:
             degree, deg = setUpPair(run_obj, ss_lambda = None, calculate_weight = True, child=c, parent=parent)
-        #else:
-        #    degree, deg = setUpPair(run_obj, ss_lambda=run_obj.params.get('weight', None))
-
+        
         
         # get positive and negative indices for the parent terms using the pos/neg dictionary constructed above
         # NOTE: the parent terms annotations for cross validation come from the full annotation matrix 
@@ -240,7 +237,7 @@ def run(run_obj):
          
         # For every negative annotation that has become unknown in the current fold annotations of the child term
             # erase the annotation of the corresponding gene from the parent term as well.
-            # This is done since 
+
 
         # get the child terms original annotations
         child_orig = orig_ann[c,:]
@@ -273,9 +270,7 @@ def run(run_obj):
              
         assert len(negatives_par) <= len(copy_par_neg), "Number of negative annotations after removing have increased"
         assert len(positives_par) <= len(copy_par_pos), "Number of positive annotations after removing have increased"
-        
-        #run_obj.neg_erased.append(len(set(copy_par_neg) - set(negatives_par)))
-         
+           
             
         # call fastsinksource on the parent term using the positive negative indices from the dictionary/above updated indices
 
@@ -289,17 +284,15 @@ def run(run_obj):
                 "(%0.4f sec) for %s" % (process_time, goid_par))
         
 
-        # update the P (adjacency matrix) to alter the weights of the edges due to the effect of adding a weight of "w" from each node to itself
-       
-
+        # update the P (adjacency matrix) to alter the weights of the edges due to the effect of adding a weight of "w" to each node in the network
         new_P = run_obj.Pchild
         
+
         # update the parent scores to be normalized by the degree obtained by considering the notion of adding an edge of weight 'w' that represent the parent score
         # now multiply the parent scores by this weighted degree
         # the scores will then be added to the fixed score vector "f" computed in alg_utils
 
         for i in range(len(parent_scores)):
-            #print(parent_scores[i], deg[i], degree)
             parent_scores[i] = parent_scores[i]*deg[i]*degree
 
         
@@ -323,7 +316,7 @@ def run(run_obj):
    
     # get the scores of all the nodes that are only parent terms
     # for this we use the fold annotation directly.
-
+    # NOTE: this is not needed for GO-HPO matchings
     for term in only_parents:
         p = run_obj.ann_matrix[term,:]
         positives_par = (p > 0).nonzero()[1]
@@ -340,20 +333,11 @@ def run(run_obj):
 
         goid_scores[term] = parent_scores
     
-    #print(goid_scores)
     print(goid_scores.shape)
 
     # store the scores in the runner object of the algorithm
     run_obj.goid_scores = goid_scores
     run_obj.params_results = params_results
-    #print(run_obj.neg_erased)
-    
-    '''
-    with open('num_neg_erased.txt','a') as f:
-        f.write('\n'.join(str(v) for v in run_obj.neg_erased))
-    '''
-    print("Total erased: {}".format(run_obj.neg_erased))
-    print(run_obj.count)
 
     return
     
