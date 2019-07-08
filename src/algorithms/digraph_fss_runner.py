@@ -40,6 +40,14 @@ def setupInputs(run_obj):
 
     run_obj.neg_erased = 0
     run_obj.count = 0
+
+    # if the matchings considered are HPO-HPO
+    if run_obj.params['matching_hpo']:
+        run_obj.parent_full_ann = run_obj.orig_ann
+        run_obj.child_full_ann = run_obj.orig_ann
+    # if the matchings considered are HPO-GO
+    #else:
+    
     return
 
 def compute_degree(W, factor, axis = 1):
@@ -153,11 +161,7 @@ def run(run_obj):
     params = run_obj.params
     a, eps, max_iters = params['alpha'], float(params['eps']), params['max_iters']
     
-    
-    # this contains the full annotation matrix for the hpo terms 
-    orig_ann = run_obj.orig_ann
-    
-     
+
     # Read the child-parent pairs from the csv file and construct a dictionary where the keys are the child nodes
     
     pairs = {}
@@ -175,22 +179,19 @@ def run(run_obj):
             pairs[hpoidx[row[0]]] = hpoidx[row[1]]
             child.append(hpoidx[row[0]])
             par.append(hpoidx[row[1]])
-            degree_pair[hpoidx[row[0]]] = float(row[2])
+            if params['itss_scores'] == True:
+                degree_pair[hpoidx[row[0]]] = float(row[2])
 
-    #print("Number of children terms constructed: {}" .format(len(pairs)))
-    
-    #print("Number of nodes that are only parents: {}" .format(len(set(par) - set(child))))
-
-    assert len(pairs) == run_obj.ann_matrix.shape[0]- (len(set(par) - set(child))), "Number of modified children scores not the same as number of children in pairs"
-    
+     
     # used later to add the scores of the parent terms to the matrix
     # this is done since some terms are only parents, and thus are not handled during the parent-child run
     # NOTE: incase of GO-HPO matching, this needs to be commented out/ removed
-    only_parents = list(set(par)-set(child))
+    if params['matching_hpo']:
+        only_parents = list(set(par)-set(child))
     
     # if a prespecified weight is to be used for edges for all hpo term pairs
     if params['itss_scores'] == False and params['frac_ann_scores'] == False:
-        degree, deg = setUpPair(run_obj, ss_lambda=run_obj.params.get('weight', None))
+        weight, deg = setUpPair(run_obj, ss_lambda=run_obj.params.get('weight', None))
 
 
     # Run the parent-child model
@@ -211,17 +212,22 @@ def run(run_obj):
         
         # if itss scores are to be used then degree_pair[c] is to be used as the weight of an edge
 
-        if params['itss_scores'] == True:
-            degree, deg = setUpPair(run_obj, ss_lambda=degree_pair[c])
+        if params['itss_scores']:
+            weight, deg = setUpPair(run_obj, ss_lambda=degree_pair[c])
 
         # calculate weight of edge using the fraction of proteins annotated to the child and the number of proteins annotated to parent
-        elif params['frac_ann_scores'] == True:
-            degree, deg = setUpPair(run_obj, ss_lambda = None, calculate_weight = True, child=c, parent=parent)
+        elif params['frac_ann_scores']:
+            weight, deg = setUpPair(run_obj, ss_lambda = None, calculate_weight = True, child=c, parent=parent)
         
         
         # get positive and negative indices for the parent terms using the pos/neg dictionary constructed above
-        # NOTE: the parent terms annotations for cross validation come from the full annotation matrix 
-        p = orig_ann[parent,:]
+        # NOTE: the parent terms annotations for cross validation come from the full annotation matrix i
+
+        parent_full_ann = run_obj.parent_full_ann
+        child_full_ann = run_obj.child_full_ann
+
+        # TODO: write a function to update the parent annotations since the parent can either be a GO term or an HPO term
+        p = parent_full_ann[parent,:]
         positives_par = (p > 0).nonzero()[1]
         negatives_par = (p < 0).nonzero()[1]
 
@@ -240,7 +246,7 @@ def run(run_obj):
 
 
         # get the child terms original annotations
-        child_orig = orig_ann[c,:]
+        child_orig = child_full_ann[c,:]
 
         # obtain the annotations in the full annotation list of the child term
         child_orig_neg = (child_orig < 0).nonzero()[1]
@@ -253,8 +259,7 @@ def run(run_obj):
         # erase the annotations of these negative gene terms of the child not present in the current fold, from the full annotations of the parent term
         # TODO: convert this to a set operation
         
-        # for each erased negative annotation
-         
+        # for each erased negative annotation 
         for neg in child_neg_erased:
             # if it exists in the parents set of negative annotations
             if neg in negatives_par:
@@ -291,9 +296,10 @@ def run(run_obj):
         # update the parent scores to be normalized by the degree obtained by considering the notion of adding an edge of weight 'w' that represent the parent score
         # now multiply the parent scores by this weighted degree
         # the scores will then be added to the fixed score vector "f" computed in alg_utils
-
+        # *deg* = updated weighted degree of each node in the network
+        # *weight* = the weight of the score carrying edge
         for i in range(len(parent_scores)):
-            parent_scores[i] = parent_scores[i]*deg[i]*degree
+            parent_scores[i] = parent_scores[i]*deg[i]*weight
 
         
 
@@ -317,21 +323,22 @@ def run(run_obj):
     # get the scores of all the nodes that are only parent terms
     # for this we use the fold annotation directly.
     # NOTE: this is not needed for GO-HPO matchings
-    for term in only_parents:
-        p = run_obj.ann_matrix[term,:]
-        positives_par = (p > 0).nonzero()[1]
-        negatives_par = (p < 0).nonzero()[1]
+    if params['matching_hpo']:
+        for term in only_parents:
+            p = run_obj.ann_matrix[term,:]
+            positives_par = (p > 0).nonzero()[1]
+            negatives_par = (p < 0).nonzero()[1]
 
-        goid = run_obj.goids[term]
-        parent_scores, process_time, wall_time, iters = fastsinksource.runFastSinkSource(
-                P, positives_par, negatives=negatives_par, max_iters=max_iters,
-                eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False))
+            goid = run_obj.goids[term]
+            parent_scores, process_time, wall_time, iters = fastsinksource.runFastSinkSource(
+                    P, positives_par, negatives=negatives_par, max_iters=max_iters,
+                    eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False))
 
 
-        tqdm.write("\t%s Parent Term converged after %d iterations " % (alg, iters) +
+            tqdm.write("\t%s Parent Term converged after %d iterations " % (alg, iters) +
                 "(%0.4f sec) for %s" % (process_time, goid))
 
-        goid_scores[term] = parent_scores
+            goid_scores[term] = parent_scores
     
     print(goid_scores.shape)
 
