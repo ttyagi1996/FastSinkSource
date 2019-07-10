@@ -267,7 +267,9 @@ def setup_fixed_scores(P, positives, negatives=None, a=1,
 
         for i in range(f.shape[0]):
             #print(f[i], scores[i])
+            temp = f[i]
             f[i] = f[i] + scores[i]
+            assert temp == f[i]
     '''
     print("*********Checking shapes************")
     print("P's shape: %s %s" %(P.shape[0], P.shape[1]))

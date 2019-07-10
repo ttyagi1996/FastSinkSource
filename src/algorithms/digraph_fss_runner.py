@@ -33,7 +33,7 @@ def setupInputs(run_obj):
         run_obj.P = None
     else:
         run_obj.P = alg_utils.normalizeGraphEdgeWeights(run_obj.net_obj.W, ss_lambda=None)
-        #run_obj.Pchild = alg_utils.normalizeGraphEdgeWeights(run_obj.net_obj.W, ss_lambda=run_obj.params.get('lambda', None))
+        run_obj.Pchild = alg_utils.normalizeGraphEdgeWeights(run_obj.net_obj.W, ss_lambda=run_obj.params.get('weight', None))
 
     run_obj.hpo2idx = run_obj.ann_obj.goid2idx
     run_obj.prots = run_obj.net_obj.nodes
@@ -113,6 +113,7 @@ def get_new_adj_matrix(run_obj, ss_lambda):
         run_obj.Pchild = alg_utils.normalizeGraphEdgeWeights(run_obj.child_W, ss_lambda=ss_lambda)
 
     else:
+        print('Pchild degree {}' .format(ss_lambda))
         run_obj.child_W = run_obj.net_obj.W
         run_obj.Pchild = alg_utils.normalizeGraphEdgeWeights(run_obj.child_W, ss_lambda=ss_lambda)
 
@@ -125,12 +126,11 @@ def setUpPair(run_obj, ss_lambda, calculate_weight=False, child=None, parent=Non
     weight = ss_lambda
     if ss_lambda is not None:
         # this happens when the option is either itss or a prespecified score
-        degree = weight
         # set up new adjacency matrix
         get_new_adj_matrix(run_obj, ss_lambda=weight)           # sets up run_obj.Pchild and run_obj.child_W
 
         # get the degree of the the nodes of the genes for the child term, to be used for multiplying by score
-        deg_nodes = compute_degree(run_obj.child_W, degree).toarray().flatten()
+        deg_nodes = compute_degree(run_obj.child_W, weight).toarray().flatten()
 
         return weight, deg_nodes
 
@@ -139,9 +139,8 @@ def setUpPair(run_obj, ss_lambda, calculate_weight=False, child=None, parent=Non
 
         # calculate the weight of score carrying edge depending on the number of annotations in the parent and child terms
         weight = update_degree(run_obj, child, parent)
-        degree=weight
         get_new_adj_matrix(run_obj, ss_lambda=weight)
-        deg_nodes = compute_degree(run_obj.child_W, degree).toarray().flatten()
+        deg_nodes = compute_degree(run_obj.child_W, weight).toarray().flatten()
         return weight, deg_nodes
 
         
@@ -149,7 +148,26 @@ def setUpPair(run_obj, ss_lambda, calculate_weight=False, child=None, parent=Non
 
 
 def run(run_obj):
-    
+    '''
+    Step1: First the child-parent pairs are read from a file, and stored in a dictionary
+    Step2: Re-normalizing the network
+    * check if the weight assigned for score carrying edges for all child-parent pairs is identical
+    ** This is given if the itss_scores and frac_ann_scores params are set to false in the config file.
+    ** Then the weight specified in the weight parameter of config file is used to weigh all the score carrying edges
+    ** using this prespecified score, we set the child-parent pairs
+    ** This involves recomputing the normalized adjacency matrix, as well as obtaining the weighted degree of every node in the network
+    * Else, if itss_scores is set to true, then we use the precomputed itss scores as weight for score carrying edges for the child-parent pair
+    ** This is given in a column in the matchings_file
+    * The last option is to compute the weight of score carrying edges based on the annotations of the child-parent pair, computed as a fraction of child to parent
+    Step3: Updating the parent annotations based on the child annotations in the current fold
+    * For parent HPO term, use the full annotations
+    * For every negative annotation in the child term that has been erased in the current fold, erase it for the parent term as well
+    * For every positive annotation in the child term that has been erased in the current fold, erase it for the parent term as well
+    Step4: Call FastSinkSource on the parent term with these updated annotations
+    Step5: Normalizing parent scores
+    * The parent scores are weighted according to the weight of the score carrying edge and normalized by the degrees obtained from step2
+    Step6: Finally, these scores are passed to the fastsinksource algorithm which passed them to alg_utils, where the parent scores are added to the f-vector 
+    '''
     
     
     params_results = run_obj.params_results 
@@ -176,9 +194,12 @@ def run(run_obj):
     with open(params['matchings_file'], "r") as f:
         reader = csv.reader(f, delimiter=',')
         for row in reader:
-            pairs[hpoidx[row[0]]] = hpoidx[row[1]]
-            child.append(hpoidx[row[0]])
-            par.append(hpoidx[row[1]])
+            if(params['matching_hpo']) :
+                pairs[hpoidx[row[0]]] = hpoidx[row[1]]
+                par.append(hpoidx[row[1]])
+                child.append(hpoidx[row[0]])
+            #else:
+                # set the value of corresponding key to be index mapping for GO term   
             if params['itss_scores'] == True:
                 degree_pair[hpoidx[row[0]]] = float(row[2])
 
@@ -190,9 +211,12 @@ def run(run_obj):
         only_parents = list(set(par)-set(child))
     
     # if a prespecified weight is to be used for edges for all hpo term pairs
-    if params['itss_scores'] == False and params['frac_ann_scores'] == False:
-        weight, deg = setUpPair(run_obj, ss_lambda=run_obj.params.get('weight', None))
-
+    #if params['itss_scores'] == False and params['frac_ann_scores'] == False:
+    #weight, deg_nodes = setUpPair(run_obj, ss_lambda=run_obj.params.get('weight'))
+    
+    weight = params['weight']
+    #get_new_adj_matrix(run_obj, ss_lambda=weight)
+    #deg = compute_degree(run_obj.child_W, weight)
 
     # Run the parent-child model
 
@@ -203,30 +227,30 @@ def run(run_obj):
         # store the parent of the given child term
         parent = pairs[c]
 
-        # store the goids of the parent and child terms
-        goid_par = run_obj.goids[parent]
-        goid_child = run_obj.goids[c]
+        # store the hpoids of the parent and child terms
+        hpoid_par = run_obj.goids[parent]
+        hpoid_child = run_obj.goids[c]
 
-        print(goid_child, goid_par)
+        print(hpoid_child, hpoid_par)
         
-        
+        #TODO: revert back to using the setUpPair function
         # if itss scores are to be used then degree_pair[c] is to be used as the weight of an edge
 
-        if params['itss_scores']:
-            weight, deg = setUpPair(run_obj, ss_lambda=degree_pair[c])
+        #if params['itss_scores']:
+        #    weight, deg_nodes = setUpPair(run_obj, ss_lambda=degree_pair[c])
 
         # calculate weight of edge using the fraction of proteins annotated to the child and the number of proteins annotated to parent
-        elif params['frac_ann_scores']:
-            weight, deg = setUpPair(run_obj, ss_lambda = None, calculate_weight = True, child=c, parent=parent)
+        #elif params['frac_ann_scores']:
+        #    weight, deg_nodes = setUpPair(run_obj, ss_lambda = None, calculate_weight = True, child=c, parent=parent)
         
         
         # get positive and negative indices for the parent terms using the pos/neg dictionary constructed above
-        # NOTE: the parent terms annotations for cross validation come from the full annotation matrix i
+        # NOTE: the parent terms annotations for cross validation come from the full annotation matrix
 
         parent_full_ann = run_obj.parent_full_ann
         child_full_ann = run_obj.child_full_ann
 
-        # TODO: write a function to update the parent annotations since the parent can either be a GO term or an HPO term
+        # obtain the parent terms full annotations
         p = parent_full_ann[parent,:]
         positives_par = (p > 0).nonzero()[1]
         negatives_par = (p < 0).nonzero()[1]
@@ -265,20 +289,25 @@ def run(run_obj):
             if neg in negatives_par:
                 # remove the neg annotations from the parent
                 negatives_par = np.delete(negatives_par, np.where(negatives_par == neg))
-                run_obj.neg_erased += 1
+                #run_obj.neg_erased += 1
 
         for pos in child_pos_erased:
             if pos in positives_par:
                 positives_par = np.delete(positives_par, np.where(positives_par == pos))
-                run_obj.count += 1
+                #run_obj.count += 1
         
              
         assert len(negatives_par) <= len(copy_par_neg), "Number of negative annotations after removing have increased"
         assert len(positives_par) <= len(copy_par_pos), "Number of positive annotations after removing have increased"
-           
-            
+        
+        #print(len(child_orig_neg), len(negatives))
+        #print(len(copy_par_neg), len(child_neg_erased), len(negatives_par)) 
+        
+        if(all(child_orig_neg) != all(copy_par_neg)):
+            run_obj.count += 1
+        
         # call fastsinksource on the parent term using the positive negative indices from the dictionary/above updated indices
-
+        
         parent_scores, process_time, wall_time, iters = fastsinksource.runFastSinkSource(
                 P, positives_par, negatives=negatives_par, max_iters=max_iters,
                 eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False))
@@ -286,21 +315,28 @@ def run(run_obj):
 
 
         tqdm.write("\t%s Parent Term converged after %d iterations " % (alg, iters) +
-                "(%0.4f sec) for %s" % (process_time, goid_par))
+                "(%0.4f sec) for %s" % (process_time, hpoid_par))
         
 
         # update the P (adjacency matrix) to alter the weights of the edges due to the effect of adding a weight of "w" to each node in the network
         new_P = run_obj.Pchild
-        
+        deg = compute_degree(run_obj.net_obj.W, weight).toarray().flatten()
 
         # update the parent scores to be normalized by the degree obtained by considering the notion of adding an edge of weight 'w' that represent the parent score
         # now multiply the parent scores by this weighted degree
         # the scores will then be added to the fixed score vector "f" computed in alg_utils
         # *deg* = updated weighted degree of each node in the network
         # *weight* = the weight of the score carrying edge
+        #print(deg)
         for i in range(len(parent_scores)):
-            parent_scores[i] = parent_scores[i]*deg[i]*weight
+            temp = deg[i]
+            score_temp = parent_scores[i]
+            parent_scores[i] = score_temp*temp
 
+            parent_scores[i] = parent_scores[i]*weight
+            #print(parent_scores[i])
+            if weight == 0:
+                assert parent_scores[i] == 0
         
 
         # call fastsinksource for the child term and send the scores of the parent term to update the fixed "f" scores
@@ -310,10 +346,16 @@ def run(run_obj):
                 eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False),  scores = parent_scores)
         
 
+        sanity_scores, process_time, wall_time, iters = fastsinksource.runFastSinkSource(
+                new_P, positives, negatives=negatives, max_iters=max_iters,
+                eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False))
+
+        assert scores.all() == sanity_scores.all(), "Scores not the same"
+
         assert scores.shape[0] == run_obj.ann_matrix.shape[1], "Number of genes in scores doesn't match total number of genes"
 
         tqdm.write("\t%s Child term converged after %d iterations " % (alg, iters) +
-                "(%0.4f sec) for %s" % (process_time, goid_child))
+                "(%0.4f sec) for %s" % (process_time, hpoid_child))
         
         # store the scores of the child term in the matrix
         goid_scores[c] = scores
@@ -345,7 +387,7 @@ def run(run_obj):
     # store the scores in the runner object of the algorithm
     run_obj.goid_scores = goid_scores
     run_obj.params_results = params_results
-
+    print(run_obj.count)
     return
     
 
