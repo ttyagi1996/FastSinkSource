@@ -320,6 +320,8 @@ def run(run_obj):
 
         # update the P (adjacency matrix) to alter the weights of the edges due to the effect of adding a weight of "w" to each node in the network
         new_P = run_obj.Pchild
+
+        # call the function to get the updated weighted degree of each node in the network, with the addition of an edge of weight w
         deg = compute_degree(run_obj.net_obj.W, weight).toarray().flatten()
 
         # update the parent scores to be normalized by the degree obtained by considering the notion of adding an edge of weight 'w' that represent the parent score
@@ -327,17 +329,13 @@ def run(run_obj):
         # the scores will then be added to the fixed score vector "f" computed in alg_utils
         # *deg* = updated weighted degree of each node in the network
         # *weight* = the weight of the score carrying edge
-        #print(deg)
-        for i in range(len(parent_scores)):
-            temp = deg[i]
-            score_temp = parent_scores[i]
-            parent_scores[i] = score_temp*temp
 
-            parent_scores[i] = parent_scores[i]*weight
-            #print(parent_scores[i])
+        for i in range(len(parent_scores)):
+            parent_scores[i] = parent_scores[i]*deg[i]*weight
+            '''
             if weight == 0:
                 assert parent_scores[i] == 0
-        
+            '''
 
         # call fastsinksource for the child term and send the scores of the parent term to update the fixed "f" scores
         # the child term FastSinkSource is called with the new normalized adjacency matrix 
