@@ -15,7 +15,7 @@ import src.algorithms.hemdag_runner as hemdag
 import src.algorithms.svm_runner as svm
 import src.algorithms.digraph_fss_runner as digraph_fss
 #import src.algorithms.semantic_similarity_runner as itss
-import src.algorithms.up_parent_child_runner as parent_child
+import src.algorithms.fss_parent_child_runner as parent_child
 import src.algorithms.genemania_parent_child_runner as genemania_pc
 import numpy as np
 from scipy import sparse
