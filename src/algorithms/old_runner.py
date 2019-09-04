@@ -9,20 +9,31 @@ import src.algorithms.apt_birg_rank_runner as birgrank
 import src.algorithms.sinksource_bounds
 from src.algorithms.aptrank_birgrank.birgrank import birgRank
 import src.algorithms.aptrank_birgrank.run_birgrank as run_birgrank
+import src.algorithms.ranks_runner as ranks
+import src.algorithms.hemdag_runner as hemdag
+#import src.algorithms.sanity_hemdag as sanity
+import src.algorithms.svm_runner as svm
+import src.algorithms.digraph_fss_runner as digraph_fss
+#import src.algorithms.semantic_similarity_runner as itss
+import src.algorithms.fss_parent_child_runner as parent_child
+import src.algorithms.genemania_parent_child_runner as genemania_pc
 import numpy as np
 from scipy import sparse
 
 
 LibMapper = {
-    'sinksource': fastsinksource,
-    'sinksourceplus': fastsinksource,
     'fastsinksource': fastsinksource,
-    'fastsinksourceplus': fastsinksource,
-    'local': fastsinksource,
-    'localplus': fastsinksource,
     'genemania': genemania,
     'aptrank': birgrank,
     'birgrank': birgrank,
+    'ranks' : ranks,
+    'hemdag' : hemdag,
+    #'sanity' : sanity,
+    'svm' : svm,
+    'digraph_fss' : digraph_fss,
+    'parent_child' : parent_child,
+    'genemania_pc' : genemania_pc,
+    #'itss' : itss,
 }
 
 
@@ -61,9 +72,18 @@ class Runner(object):
         self.goid_scores = sparse.csr_matrix(ann_obj.ann_matrix.shape, dtype=np.float)
 
         # keep track of the weighting method for writing to the output file later
+<<<<<<< HEAD
+        self.weight_str = '%s%s%s' % (
+            'unw-' if net_obj.unweighted else '', 
+            'gm2008-' if net_obj.weight_gm2008 else '',
+            'swsn-' if net_obj.weight_swsn else '')
+        #self.setupParamsStr()
+        self.setupParamsStr(self.weight_str, params, name)
+=======
         self.setupParamsStr(net_obj.weight_str, params, name)
 
 
+>>>>>>> master
     # if the method is not in Python and needs to be called elsewhere, use this
     def setupInputs(self):
         LibMapper[self.name].setupInputs(self)
@@ -80,7 +100,6 @@ class Runner(object):
     # setup the params_str used in the output file
     def setupParamsStr(self, weight_str, params, name):
         self.params_str = LibMapper[self.name].setup_params_str(weight_str, params, name)
-
 
 def get_runner_params_str(name, dataset, params):
     """

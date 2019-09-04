@@ -14,7 +14,9 @@ except ImportError:
     pass
 
 
-def run_cv_all_goterms(alg_runners, ann_obj, folds=5, num_reps=1, cv_seed=None, **kwargs):
+def run_cv_all_goterms(
+        alg_runners, ann_obj, folds=5, num_reps=1, 
+        cv_seed=None, **kwargs):
     """
     Split the positives and negatives into folds across all GO terms
     and then run the algorithms on those folds.
@@ -100,6 +102,9 @@ def run_cv_all_goterms(alg_runners, ann_obj, folds=5, num_reps=1, cv_seed=None, 
                     curr_comb_scores[test_neg] = curr_goid_scores[test_neg]
                     combined_fold_scores[i] = curr_comb_scores 
 
+            # replace the goid_scores in the runner to combined_fold_scores to evaluate
+            run_obj.goid_scores = combined_fold_scores 
+
             #curr_goids = dag_goids if alg == 'birgrank' else goids
             # now evaluate the results and write to a file
             out_file = "%s/cv-%dfolds-rep%d%s%s.txt" % (
@@ -107,7 +112,7 @@ def run_cv_all_goterms(alg_runners, ann_obj, folds=5, num_reps=1, cv_seed=None, 
                 "-seed%s"%curr_seed if curr_seed is not None else "", run_obj.params_str)
             utils.checkDir(os.path.dirname(out_file)) 
             eval_utils.evaluate_ground_truth(
-                combined_fold_scores, ann_obj, out_file,
+                run_obj, ann_obj, out_file,
                 #non_pos_as_neg_eval=opts.non_pos_as_neg_eval,
                 alg=run_obj.name, append=False, **kwargs)
 
