@@ -16,7 +16,7 @@ from pathlib import Path
 import src.algorithms.fastsinksource_runner as fastsinksource
 
 
-def setup_params_str(run_obj):
+def setup_params_str(weight_str,param_str,run_obj):
     return
 
 
@@ -110,13 +110,13 @@ def net_file_to_ids(run_obj, filename, outfile, ont=0):
 
 def call_set_inputs():
     print("setting inputs for RANKS")
-    subprocess.call("/home/ttyagi007/projects/hpo/FastSinkSource/src/algorithms/hemdag_set_inputs.R", shell=True)
+    subprocess.call("/home/ttyagi007/projects/github/FastSinkSource/src/algorithms/hemdag_set_inputs.R", shell=True)
     print("inputs for HEMDAG have been set")
 
 
 def call_hemdag():
     print("Calling HEMDAG")
-    subprocess.call("../FastSinkSource/src/algorithms/hemdag.R", shell=True)
+    subprocess.call("/home/ttyagi007/projects/github/FastSinkSource/src/algorithms/hemdag.R", shell=True)
     print("HEMDAG finished")
 
 
@@ -126,7 +126,7 @@ def write_scores_to_file(hpo_scores, hpoids, prots, out_file):
             scores = hpo_scores[i].toarray().flatten()
             scores = {j:s for j, s in enumerate(scores)}
             for n in sorted(scores, key=scores.get, reverse=True)[:-1]:
-                out.write("%s\t%s\t%0.6e\n" % (i, n, scores[n]))
+                out.write("%s %s %0.6e\n" % (i, n, scores[n]))
 
 
 def conv_ann_to_adjList(run_obj):
@@ -142,7 +142,7 @@ def conv_ann_to_adjList(run_obj):
         hpoid_ann = ann_matrix[i,:]
         positives = (hpoid_ann > 0).nonzero()[1]
         for x in positives:
-            adjList.append([x, hpoid[i], 1])
+            adjList.append([hpoid[i], x, 1])
 
     return adjList
 
@@ -182,23 +182,23 @@ def run(run_obj):
 
     # write the flat scores to a file
 
-    #out_file = "./data/HEMDAG/fss_scores.txt"
-    #write_scores_to_file(run_obj.goid_scores, run_obj.hpoids, run_obj.prots, out_file)
+    out_file = "./data/HEMDAG/fss_scores.txt"
+    write_scores_to_file(run_obj.goid_scores, run_obj.hpoids, run_obj.prots, out_file)
 
 
-    '''
+    
     # write the annotation matrix in form of edges in a text file
     ann_file = Path("./data/HEMDAG/ann.txt")
 
-    if(not ann_file.exists()):
-        print("construct triples")
-        adjList = conv_ann_to_adjList(run_obj)
+    #if(not ann_file.exists()):
+    print("construct triples")
+    adjList = conv_ann_to_adjList(run_obj)
 
-        print("write the triples to file")
-        write_to_files(adjList, ann_file)
+    print("write the triples to file")
+    write_to_files(adjList, ann_file)
  
     # convert the FSS scores and annotation matrix to rda files
-    '''
+    
 
     call_set_inputs()
     

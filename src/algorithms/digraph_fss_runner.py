@@ -215,8 +215,7 @@ def run(run_obj):
     #weight, deg_nodes = setUpPair(run_obj, ss_lambda=run_obj.params.get('weight'))
     
     weight = params['weight']
-    #get_new_adj_matrix(run_obj, ss_lambda=weight)
-    #deg = compute_degree(run_obj.child_W, weight)
+
 
     # Run the parent-child model
 
@@ -228,10 +227,16 @@ def run(run_obj):
         parent = pairs[c]
 
         # store the hpoids of the parent and child terms
-        hpoid_par = run_obj.goids[parent]
-        hpoid_child = run_obj.goids[c]
+        if params['matching_hpo']:
+            id_par = run_obj.goids[parent]
+            id_child = run_obj.goids[c]
+        '''
+        else:
+            id_par = parent_terms_goid[parent]
+            id_child = run_obj.goids[c]
+        '''
 
-        print(hpoid_child, hpoid_par)
+        print(id_child, id_par)
         
         #TODO: revert back to using the setUpPair function
         # if itss scores are to be used then degree_pair[c] is to be used as the weight of an edge
@@ -315,7 +320,7 @@ def run(run_obj):
 
 
         tqdm.write("\t%s Parent Term converged after %d iterations " % (alg, iters) +
-                "(%0.4f sec) for %s" % (process_time, hpoid_par))
+                "(%0.4f sec) for %s" % (process_time, id_par))
         
 
         # update the P (adjacency matrix) to alter the weights of the edges due to the effect of adding a weight of "w" to each node in the network
@@ -343,7 +348,7 @@ def run(run_obj):
                 new_P, positives, negatives=negatives, max_iters=max_iters,
                 eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False),  scores = parent_scores)
         
-
+        '''
         sanity_scores, process_time, wall_time, iters = fastsinksource.runFastSinkSource(
                 new_P, positives, negatives=negatives, max_iters=max_iters,
                 eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False))
@@ -351,9 +356,9 @@ def run(run_obj):
         assert scores.all() == sanity_scores.all(), "Scores not the same"
 
         assert scores.shape[0] == run_obj.ann_matrix.shape[1], "Number of genes in scores doesn't match total number of genes"
-
+        '''
         tqdm.write("\t%s Child term converged after %d iterations " % (alg, iters) +
-                "(%0.4f sec) for %s" % (process_time, hpoid_child))
+                "(%0.4f sec) for %s" % (process_time, id_child))
         
         # store the scores of the child term in the matrix
         goid_scores[c] = scores

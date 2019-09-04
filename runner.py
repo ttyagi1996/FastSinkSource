@@ -15,6 +15,7 @@ import src.algorithms.sanity_hemdag as sanity
 import src.algorithms.svm_runner as svm
 import src.algorithms.digraph_fss_runner as digraph_fss
 import src.algorithms.semantic_similarity_runner as itss
+import src.algorithms.parent_child as pc
 import numpy as np
 from scipy import sparse
 
@@ -30,6 +31,7 @@ LibMapper = {
     'svm' : svm,
     'digraph_fss' : digraph_fss,
     'itss' : itss,
+    'parent_child' : pc,
 }
 
 

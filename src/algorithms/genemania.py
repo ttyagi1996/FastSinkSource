@@ -26,9 +26,14 @@ def runGeneMANIA(L, y, tol=1e-05, verbose=False):
 
     *returns*: scores array, process_time, wall_time
         # of iterations needed to converge
+    
     """
+    
     y = y.copy()
+    #y = y.toarray().flatten()
     # setup the y vector with the value for the unknowns
+    #num_pos = len((y > 0).nonzero()[1])
+    #num_neg = len((y < 0).nonzero()[1])
     num_pos = len(np.where(y == 1)[0])
     num_neg = len(np.where(y == -1)[0])
     if num_pos == 0:
