@@ -31,7 +31,9 @@ def setupInputs(run_obj):
     if run_obj.params['matching_hpo']:
         run_obj.parent_full_ann = run_obj.orig_ann
         run_obj.child_full_ann = run_obj.orig_ann
-    
+    '''
+    else:   
+    '''
     run_obj.neg_erased = 0
     run_obj.pos_erased = 0
     return
@@ -59,37 +61,14 @@ def setupOutputFile(run_obj):
 def setupOutputs(run_obj):
     return
 
-def callGenemania(term, net_matrix, term_ann, run_obj):
-
-    # set the graph laplacian for genemania
-
-    L = genemania.setup_laplacian(net_matrix)
-
-    params_results = run_obj.params_results
-    goid_scores = run_obj.goid_scores
-    alg = run_obj.name
-
-    # run GeneMANIA on each GO term individually
-    #for i in tqdm(range(pc_ann_matrix.shape[0])):
-    goid = run_obj.hpoids[term]
-    # get the row corresponding to the current goids annotations
-    #y = ann_matrix[term,:]
-    y = term_ann
-        # now actually run the algorithm
-    scores, process_time, wall_time, iters = genemania.runGeneMANIA(L, y, tol=float(run_obj.params['tol']), verbose=run_obj.kwargs.get('verbose', False))
-    tqdm.write("\t%s converged after %d iterations " % (alg, iters) +
-            "(%0.3f sec, %0.3f wall_time) for %s" % (process_time, wall_time, goid))
-        
-
-        
-        #print(goid_scores[i].shape, scores.shape)
-    goid_scores = scores[:goid_scores.shape[1]]
-
-    # also keep track of the time it takes for each of the parameter sets
-    params_results["%s_wall_time"%alg] += wall_time
-    params_results["%s_process_time"%alg] += process_time
-
-    return goid_scores
+def check_scores(orig_scores, new_scores):
+    '''
+    orig_scores: represent the scores obtained from a normal run of fastsinksource
+    new_scores: size:2*len(orig_scores). represent the scores obtained for all nodes in the double layer network
+    - need to check if the second half of new_scores is equal to orig_scores
+    - need to check if first half of new scores is equal to 
+    '''
+    return
 
 
 def run(run_obj):
@@ -136,6 +115,7 @@ def run(run_obj):
         parent = pairs[c]
 
         # store the hpoids of the parent and child terms
+        # matching_hpo identifies if it is a hpo-hpo matching
         if params['matching_hpo']:
             id_par = run_obj.hpoids[parent]
             id_child = run_obj.hpoids[c]
@@ -236,13 +216,24 @@ def run(run_obj):
         P = alg_utils.normalizeGraphEdgeWeights(W_combined, ss_lambda=None)
     
         """
-        new_size = (net_matrix.shape[0]*2, 2*net_matrix.shape[1])
-        W_combined = sparse.lil_matrix(new_size, dtype=np.float)
 
+        # the new network is twice the size of the original network. the size is stored in new_size
+        new_size = (net_matrix.shape[0]*2, 2*net_matrix.shape[1])
+
+        # initialize the new double layer network with the new size
+        W_combined = sparse.lil_matrix(new_size, dtype=np.float)
+        
+
+        # the first half rows and columns correspond to the genes in the child network layer
+        # the second half rows and columns correspong to the genes in the parent network layer
+
+        # the first quarter of the new adjacency matrix is equal to the original matrix
         print("Setting first quarter of new adjacency matrix")
         for i in tqdm(range(net_matrix.shape[0])):
             W_combined[i, : net_matrix.shape[1]] = net_matrix[i, : net_matrix.shape[1]]
-
+        
+        # the second quarter of the new matrix represents the edges that go from the parent network to the child network
+        # this is basically a diagonal matrix with values along the diagonal equal to the weights of edges between parent and child
         print("Setting second quarter of the new adjacency matrix")
         for i in tqdm(range(net_matrix.shape[0])):
                 W_combined[i, i+net_matrix.shape[1]] = params['weight']
@@ -250,13 +241,17 @@ def run(run_obj):
 
 
         #NOTE: the 3rd quarter of the new adjacency matrix is set to 0, since we do not consider any edges to the parent network from the child network
+        
+        # the 4th quarter represents the links between the nodes in the parent network layer
+        # this is the same as the original network we consider
         print("Setting the fourth quarter of the new adjacency matrix")
 
         #print(net_matrix.shape[0], W_combined.shape[0])
         for i in tqdm(range(net_matrix.shape[0], W_combined.shape[0])):
                 # set the fourth quarter which is equal to the original adjacency matrix
                 W_combined[i, net_matrix.shape[1] : ] = net_matrix[i-net_matrix.shape[0], : net_matrix.shape[1]]
-
+        
+        # finally the double network matrix is normalized
         print('Normalizing Matrix')
         P = alg_utils.normalizeGraphEdgeWeights(W_combined, ss_lambda=None)
                 
@@ -266,15 +261,15 @@ def run(run_obj):
     	# create the new annotations matrix
 	# new annotations matrix : childs annotations | parents updated annotations 
         # the indices in the parents positive and negative annotation sets must be incremented by the number of genes
-
+            
         negatives_par = [i + ann_matrix.shape[1] for i in negatives_par]
         positives_par = [i + ann_matrix.shape[1] for i in positives_par]
 
         
         # now create the row for the given child terms full network
-        #print(len(positives_par), len(positives))
+        # positives_par, negatives_par are the updated annotatons for the parent network
+        # positives and negatives are the annotations for the child network
         full_pos = list(set(positives_par) | set(positives))
-        #print(len(full_pos))
         full_neg = list(set(negatives_par) | set(negatives))
     
 

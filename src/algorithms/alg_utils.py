@@ -270,7 +270,7 @@ def get_goid_pos_neg(ann_matrix, i):
 
 
 def setup_fixed_scores(P, positives, negatives=None, a=1, 
-        remove_nonreachable=True, verbose=False):
+        remove_nonreachable=True, verbose=False, scores=None):
     """
     Remove the positive and negative nodes from the matrix P 
     and compute the fixed vector f which contains the score contribution 
@@ -289,7 +289,16 @@ def setup_fixed_scores(P, positives, negatives=None, a=1,
 
     # f contains the fixed amount of score coming from positive nodes
     f = a*csr_matrix.dot(P, pos_vec)
+    
+    if scores is not None:
+        assert len(f) == len(scores), "Shape of the fixed vector and scores don't match"
 
+        for i in range(f.shape[0]):
+            #print(f[i], scores[i])
+            temp = f[i]
+            f[i] = f[i] + scores[i]
+            assert temp == f[i]
+    
     if remove_nonreachable is True:
         node2idx, idx2node = {}, {}
         # remove the negatives first and then remove the non-reachable nodes

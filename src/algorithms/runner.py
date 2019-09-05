@@ -9,6 +9,12 @@ import src.algorithms.apt_birg_rank_runner as birgrank
 import src.algorithms.sinksource_bounds
 from src.algorithms.aptrank_birgrank.birgrank import birgRank
 import src.algorithms.aptrank_birgrank.run_birgrank as run_birgrank
+import src.algorithms.ranks_runner as ranks
+import src.algorithms.hemdag_runner as hemdag
+import src.algorithms.svm_runner as svm
+import src.algorithms.digraph_fss_runner as digraph_fss
+import src.algorithms.fss_parent_child_runner as parent_child
+import src.algorithms.genemania_parent_child_runner as genemania_pc
 import numpy as np
 from scipy import sparse
 
@@ -23,6 +29,13 @@ LibMapper = {
     'genemania': genemania,
     'aptrank': birgrank,
     'birgrank': birgrank,
+    'ranks' : ranks,
+    'hemdag' : hemdag,
+    #'sanity' : sanity,
+    'svm' : svm,
+    'digraph_fss' : digraph_fss,
+    'parent_child' : parent_child,
+    'genemania_pc' : genemania_pc,
 }
 
 
