@@ -20,7 +20,7 @@ import src.algorithms.genemania_parent_child_runner as genemania_pc
 #from src.algorithms.aptrank_birgrank.birgrank import birgRank
 #import src.algorithms.aptrank_birgrank.run_birgrank as run_birgrank
 import numpy as np
-from scipy import sparse
+from scipy import sparse as sp
 
 
 LibMapper = {
@@ -81,7 +81,8 @@ class Runner(object):
         # track measures about each run (e.g., running time)
         self.params_results = defaultdict(int) 
         # store the node scores for each GO term in a sparse matrix
-        self.goid_scores = sparse.csr_matrix(ann_obj.ann_matrix.shape, dtype=np.float)
+        # using lil matrix so 0s are automatically not stored
+        self.goid_scores = sp.lil_matrix(ann_obj.ann_matrix.shape, dtype=np.float)
 
         # keep track of the weighting method for writing to the output file later
         self.setupParamsStr(net_obj.weight_str, params, name)
