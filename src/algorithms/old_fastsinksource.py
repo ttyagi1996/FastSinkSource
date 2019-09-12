@@ -68,11 +68,15 @@ def runFastSinkSource(P, positives, negatives=None, max_iters=1000, eps=0.0001, 
     # remove the positive and negative nodes from the graph 
     # and setup the f vector which contains the influence from positive and negative nodes
 <<<<<<< HEAD
+<<<<<<< HEAD
     
     P, f, node2idx, idx2node = alg_utils.setup_fixed_scores(
 =======
     newP, f, = alg_utils.setup_fixed_scores(
 >>>>>>> origin/master
+=======
+    newP, f, = alg_utils.setup_fixed_scores(
+>>>>>>> master
         P, positives, negatives, a=a, remove_nonreachable=False)
     
     if max_iters > 0:
