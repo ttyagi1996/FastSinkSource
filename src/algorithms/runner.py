@@ -7,7 +7,6 @@ import src.algorithms.fastsinksource_runner as fastsinksource
 import src.algorithms.sinksource_bounds_runner as ss_bounds
 import src.algorithms.genemania_runner as genemania
 import src.algorithms.apt_birg_rank_runner as birgrank
-<<<<<<< HEAD
 import src.algorithms.sinksource_bounds
 from src.algorithms.aptrank_birgrank.birgrank import birgRank
 import src.algorithms.aptrank_birgrank.run_birgrank as run_birgrank
@@ -17,11 +16,9 @@ import src.algorithms.svm_runner as svm
 import src.algorithms.digraph_fss_runner as digraph_fss
 import src.algorithms.fss_parent_child_runner as parent_child
 import src.algorithms.genemania_parent_child_runner as genemania_pc
-=======
 #import src.algorithms.sinksource_bounds
 #from src.algorithms.aptrank_birgrank.birgrank import birgRank
 #import src.algorithms.aptrank_birgrank.run_birgrank as run_birgrank
->>>>>>> origin/master
 import numpy as np
 from scipy import sparse
 

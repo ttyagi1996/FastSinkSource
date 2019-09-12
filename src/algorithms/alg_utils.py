@@ -359,7 +359,7 @@ def setup_fixed_scores(P, positives, negatives=None, a=1,
     assert P.shape[0] == P.shape[1], "Matrix is not square"
     assert P.shape[1] == len(f), "f doesn't match size of P"
 
-    return P, f, node2idx, idx2node, fixed_nodes
+    return P, f, node2idx, idx2node
 
 
 def build_index_map(nodes, nodes_to_remove):

@@ -62,9 +62,10 @@ def runFastSinkSource(P, positives, negatives=None, max_iters=1000, eps=0.0001, 
         return np.zeros(len(num_nodes)), 0,0,0
     # remove the positive and negative nodes from the graph 
     # and setup the f vector which contains the influence from positive and negative nodes
+    
     P, f, node2idx, idx2node = alg_utils.setup_fixed_scores(
-        P, positives, negatives, a=a, remove_nonreachable=False, scores=scores)
-
+        P, positives, negatives, a=a, remove_nonreachable=False)
+    
     if max_iters > 0:
         s, process_time, wall_time, num_iters = FastSinkSource(
             P, f, max_iters=max_iters, eps=eps, a=a, verbose=verbose)

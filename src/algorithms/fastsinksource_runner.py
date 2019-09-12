@@ -91,8 +91,7 @@ def run(run_obj):
         if alg in ["fastsinksource", "fastsinksourceplus", "sinksource", "sinksourceplus"]:
             a, eps, max_iters = params['alpha'], float(params['eps']), params['max_iters']
             scores, process_time, wall_time, iters = fastsinksource.runFastSinkSource(
-                P, positives, negatives=negatives, max_iters=max_iters,
-                eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False))
+                P, positives, negatives=negatives, max_iters=max_iters, eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False))
         elif alg in ["local", "localplus"]:
             scores, process_time, wall_time = fastsinksource.runLocal(
                 P, positives, negatives=negatives)
