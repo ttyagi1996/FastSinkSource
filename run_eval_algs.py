@@ -185,7 +185,7 @@ def setup_net(input_dir, dataset, **kwargs):
                     out_pref, net_files=net_files, string_net_files=string_net_files, 
                     string_nets=string_nets,
                     string_cutoff=string_cutoff,
-                    forcenet=kwargs['forcenet'])
+                    forcenet=False)
         else:
             # if a .mat file with multiple sparse matrix networks inside of it is passed in, read that here
             net_names_file = "%s/%s/%s" % (input_dir, dataset['net_version'], dataset['net_settings']['net_names_file'])
