@@ -34,6 +34,7 @@ def setupInputs(run_obj):
         # Cannot be used by birgrank. Change to weight_swsn for now
         print("WARNING: Apt/BirgRank cannot use the gmw weighting method since scores are computed for all terms simultaneously. Using SWSN instead.")
         run_obj.net_obj.weight_swsn = True 
+        run_obj.net_obj.weight_str = "swsn"
         run_obj.net_obj.weight_gmw = False 
     if run_obj.net_obj.weight_swsn:
         W, process_time = run_obj.net_obj.weight_SWSN(run_obj.ann_matrix)
@@ -59,6 +60,8 @@ def get_alg_type():
 
 # setup the params_str used in the output file
 def setup_params_str(weight_str, params, name):
+    if weight_str == "gmw":
+        weight_str = "swsn"
     params_str = "%s" % (weight_str)
     if name == 'birgrank':
         alpha, theta, mu, br_lambda = params['alpha'], params['theta'], params['mu'], params['lambda'] 
@@ -123,11 +126,14 @@ def run(run_obj):
     params_results["%s_process_time"%alg] += process_time
 
     # limit the scores matrix to only the GOIDs for which we want the scores
-    for i in range(len(run_obj.goids_to_run)):
-        idx = run_obj.ann_obj.goid2idx[goid]
-        goid_scores[idx] = Xh[idx]
+    if len(run_obj.goids_to_run) < goid_scores.shape[0]:
+        for goid in run_obj.goids_to_run:
+            idx = run_obj.ann_obj.goid2idx[goid]
+            goid_scores[idx] = Xh[idx]
+    else:
+        goid_scores = Xh
 
-    run_obj.goid_scores = Xh
+    run_obj.goid_scores = goid_scores
     run_obj.params_results = params_results
     return
 
