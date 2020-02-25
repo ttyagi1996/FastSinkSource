@@ -124,7 +124,8 @@ def run(config_map, **kwargs):
         kwargs['leaf_terms_only'] = dataset.get('leaf_terms_only') 
         # sp_leaf_terms_only: limit the terms to only those that are the most specific, meaning remove the ancestors of all terms 
         kwargs['sp_leaf_terms_only'] = dataset.get('sp_leaf_terms_only') 
-
+        
+        kwargs['matrix_choice'] = dataset.get('matrix_choice')
         net_obj, ann_obj, eval_ann_obj = setup_dataset(dataset, input_dir, alg_settings, **kwargs) 
         # if there are no annotations, then skip this dataset
         if len(ann_obj.goids) == 0:
@@ -202,17 +203,22 @@ def setup_net(input_dir, dataset, **kwargs):
             sparse_nets, net_names, prots = alg_utils.read_multi_net_file(net_file, net_names_file, node_ids_file)
 
         weight_method = dataset['net_settings']['weight_method'].lower()
+        #matrix_choice = dataset['matrix_choice'].lower()
+
+        matrix_choice = kwargs.get('matrix_choice')
+
         net_obj = setup.Sparse_Networks(
             sparse_nets, prots, net_names=net_names, weight_method=weight_method,
-            unweighted=unweighted, verbose=kwargs.get('verbose',False)
+            unweighted=unweighted, matrix_choice=matrix_choice, verbose=kwargs.get('verbose',False)
         )
     else:
         if net_files is None:
             print("ERROR: no net files specified in the config file. Must provide either 'net_files', or 'string_net_files'")
             sys.exit()
         W, prots = alg_utils.setup_sparse_network(net_files[0], forced=kwargs.get('forcenet',False))
+        matrix_choice = kwargs.get('matrix_choice')
         net_obj = setup.Sparse_Networks(
-            W, prots, unweighted=unweighted, verbose=kwargs.get('verbose',False))
+            W, prots, unweighted=unweighted, matrix_choice=matrix_choice, verbose=kwargs.get('verbose',False))
     return net_obj
 
 

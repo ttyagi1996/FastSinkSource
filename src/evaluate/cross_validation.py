@@ -82,7 +82,7 @@ def run_cv_all_goterms(
                 print("Fold %d" % (curr_fold+1))
 
                 # change the annotation matrix to the current fold
-                curr_ann_obj = setup.Sparse_Annotations(train_ann_mat, goids, prots)
+                curr_ann_obj = setup.Sparse_Annotations(train_ann_mat, train_ann_mat, goids, prots)
                 # replace the ann_obj in the runner with the current fold's annotations  
                 run_obj.ann_obj = curr_ann_obj
                 #alg_runners = run_eval_algs.setup_runners([alg], alg_settings, net_obj, curr_ann_obj, **kwargs)

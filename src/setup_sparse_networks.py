@@ -38,7 +38,7 @@ class Sparse_Networks:
         Would be used instead of running 'gmw'
     """
     def __init__(self, sparse_networks, nodes, net_names=None,
-                 weight_method='swsn', unweighted=False, term_weights=None, verbose=False):
+                 weight_method='swsn', unweighted=False, matrix_choice = 'adjacency', term_weights=None, verbose=False):
         self.multi_net = False
         if isinstance(sparse_networks, list):
             if len(sparse_networks) > 1:
@@ -53,17 +53,20 @@ class Sparse_Networks:
         self.node2idx = {n: i for i, n in enumerate(nodes)}
         self.net_names = net_names
         self.weight_method = weight_method
+        self.matrix_choice = matrix_choice
         self.unweighted = unweighted
         self.verbose = verbose
         # make sure the values are correct
         if self.multi_net is True:
             self.weight_swsn = True if weight_method.lower() == 'swsn' else False
+            self.influece_mat = True if matrix_choice.lower() == 'influence' else False
             self.weight_gmw = True if weight_method.lower() in ['gmw', 'gm2008'] else False
             num_weight_methods = sum([self.weight_swsn, self.weight_gmw])
             if num_weight_methods == 0 or num_weight_methods > 1:
                 raise("must specify exactly one method to combine networks when multiple networks are passed in. Given method: '%s'" % (weight_method))
             self.term_weights = term_weights
         else:
+            self.influence_mat = True if matrix_choice.lower() == 'influence' else False
             self.weight_swsn = False
             self.weight_gmw = False
 
@@ -71,7 +74,8 @@ class Sparse_Networks:
         self.weight_str = '%s%s%s' % (
             '-unw' if self.unweighted else '', 
             '-gmw' if self.weight_gmw else '',
-            '-swsn' if self.weight_swsn else '')
+            '-swsn' if self.weight_swsn else ''
+            '-influence' if self.influence_mat else '-adjacency')
 
         if self.unweighted is True:
             print("\tsetting all edge weights to 1 (unweighted)")
@@ -869,3 +873,6 @@ def get_csr_components(A):
 
 def make_csr_from_components(all_data):
     return sp.csr_matrix((all_data[0], all_data[1], all_data[2]), shape=all_data[3])
+
+
+

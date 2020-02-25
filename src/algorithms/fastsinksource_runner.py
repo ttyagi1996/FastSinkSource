@@ -18,7 +18,21 @@ def setupInputs(run_obj):
     # extract the variables out of the annotation object
     run_obj.ann_matrix = run_obj.ann_obj.ann_matrix
     run_obj.goids = run_obj.ann_obj.goids
+    
+    if run_obj.net_obj.weight_swsn:
+        W, process_time = run_obj.net_obj.weight_SWSN(run_obj.ann_matrix)
+        run_obj.params_results['%s_weight_time'%(run_obj.name)] += process_time
+    else:
+        W = run_obj.net_obj.W
 
+    if run_obj.net_obj.influence_mat:
+        run_obj.P = alg_utils.influenceMatrix(W, ss_lambda=run_obj.params.get('lambda', None))
+    else:
+        run_obj.P = alg_utils.normalizeGraphEdgeWeights(W, ss_lambda=run_obj.params.get('lambda', None))
+        
+
+
+    '''
     if run_obj.net_obj.weight_swsn:
         # TODO if the net obj already has the W_SWSN object, then use that instead
         W, process_time = run_obj.net_obj.weight_SWSN(run_obj.ann_matrix)
@@ -29,6 +43,7 @@ def setupInputs(run_obj):
         run_obj.P = None
     else:
         run_obj.P = alg_utils.normalizeGraphEdgeWeights(run_obj.net_obj.W, ss_lambda=run_obj.params.get('lambda', None))
+    '''
 
     return
 
