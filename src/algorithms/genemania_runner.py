@@ -4,6 +4,7 @@ import src.algorithms.genemania as genemania
 import src.algorithms.alg_utils as alg_utils
 from tqdm import tqdm, trange
 from scipy import sparse as sp
+from scipy.sparse.linalg import spilu, LinearOperator
 import numpy as np
 
 
@@ -51,6 +52,20 @@ def setupOutputs(run_obj, **kwargs):
     return
 
 
+def compute_preconditioner(L):
+    print("running spilu")
+    start_process_time = time.process_time()
+    start_wall_time = time.time()
+    M = sp.eye(L.shape[0]) + L
+    ilu = spilu(M)
+    process_time = time.process_time() - start_process_time 
+    wall_time = time.time() - start_wall_time
+    print("finished in %0.3f sec, %0.3f process time" % (process_time, wall_time))
+    Mx = lambda x: ilu.solve(x)
+    Milu = LinearOperator(L.shape, Mx)
+    return Milu
+
+
 def run(run_obj):
     """
     Function to run GeneMANIA
@@ -65,7 +80,14 @@ def run(run_obj):
     print("Running %s with these parameters: %s" % (alg, run_obj.params))
     if len(run_obj.target_prots) != len(run_obj.net_obj.nodes):
         print("\tstoring scores for only %d target prots" % (len(run_obj.target_prots)))
+    # using a preconditioner actually makes it slower, so don't use it
+    #Milu = compute_preconditioner(L)
+    Milu = None
 
+    # only set this for per species time analysis
+    alg_name = "%s%s" % (alg, run_obj.params_str)
+    params_results["%s_wall_time"%alg_name] = 0
+    params_results["%s_process_time"%alg_name] = 0
     # run GeneMANIA on each GO term individually
     for goid in tqdm(run_obj.goids_to_run):
         idx = run_obj.ann_obj.goid2idx[goid]
@@ -78,9 +100,14 @@ def run(run_obj):
             W,_,_ = run_obj.net_obj.weight_GMW(y, goid)
             L = genemania.setup_laplacian(W)
             params_results['%s_weight_time'%(alg)] += time.process_time() - start_time
+        if alg in ['genemaniaplus']:
+            # remove the negative examples
+            y = (y > 0).astype(int)
 
         # now actually run the algorithm
-        scores, process_time, wall_time, iters = genemania.runGeneMANIA(L, y, tol=float(run_obj.params['tol']), verbose=run_obj.kwargs.get('verbose', False))
+        scores, process_time, wall_time, iters = genemania.runGeneMANIA(
+                L, y, tol=float(run_obj.params['tol']), Milu=Milu,
+                verbose=run_obj.kwargs.get('verbose', False))
         if run_obj.kwargs.get('verbose', False) is True:
             tqdm.write("\t%s converged after %d iterations " % (alg, iters) +
                     "(%0.3f sec, %0.3f wall_time) for %s" % (process_time, wall_time, goid))
@@ -102,6 +129,10 @@ def run(run_obj):
         params_results["%s_wall_time"%alg_name] += wall_time
         params_results["%s_process_time"%alg_name] += process_time
 
+    run_obj.wall_time = params_results["%s_wall_time"%alg_name]
+    run_obj.process_time = params_results["%s_process_time"%alg_name]
+
+    print("Time taken for this taxon: {}".format(run_obj.process_time))
     run_obj.goid_scores = goid_scores
     run_obj.params_results = params_results
     return

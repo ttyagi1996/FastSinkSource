@@ -78,6 +78,9 @@ def run_cv_all_goterms(
             run_obj.orig_ann = ann_matrix
             combined_fold_scores = sparse.lil_matrix(ann_matrix.shape, dtype=np.float)
             for curr_fold, (train_ann_mat, test_ann_mat) in enumerate(ann_matrix_folds):
+
+                run_obj.train_mat = train_ann_mat
+                run_obj.test_mat = test_ann_mat
                 print("*  "*20)
                 print("Fold %d" % (curr_fold+1))
 

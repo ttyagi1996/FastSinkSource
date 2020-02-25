@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env 
 
 import os, sys
 from optparse import OptionParser
@@ -6,28 +6,20 @@ from collections import defaultdict
 import networkx as nx
 # See the tutorial of obonet here: 
 # https://github.com/dhimmel/obonet/blob/master/examples/go-obonet.ipynb
-try:
-    import obonet
-except:
-    print("\tFailed to import obonet")
-# TODO temporary fix to not require pandas to parse the obo file
-try:
-    import pandas as pd
-except:
-    print("\tFailed to import pandas")
+import obonet
+import pandas as pd
 from tqdm import tqdm
-from scipy import sparse
-import gzip
 
 
 # Guide to GO evidence codes: http://geneontology.org/page/guide-go-evidence-codes
-ALL_EVIDENCE_CODES = ['EXP','IDA','IPI','IMP','IGI','IEP','HTP','HDA','HMP','HGI','HEP','ISS','ISO','ISA','ISM','IGC','IBA','IBD','IKR','IRD','RCA','TAS','NAS','IC','ND','IEA']
+ALL_EVIDENCE_CODES = ['EXP','IDA','IPI','IMP','IGI','IEP','ISS','ISO','ISA','ISM','IGC','IBA','IBD','IKR','IRD','RCA','TAS','NAS','IC','ND','IEA']
+go_categories = {'cellular_component': 'C', 'biological_process': 'P', 'molecular_function' : 'F'}
 
-# other global variables
-id_to_name = {}
-name_to_id = {}
-goid_to_category = {}  # mapping from a GO term ID and the category it belongs to ('C', 'F' or 'P')
 
+
+def parse_obo_file_and_build_dags(obo_file, 
+        categories=go_categories, master_root=None):
+    return
 
 def parse_args(args):
     ## Parse command line args.
@@ -99,95 +91,60 @@ def parse_obo_file_and_build_dags(obo_file, forced=False):
     """
     Parse the GO OBO into a networkx MultiDiGraph using obonet.
     Then construct a DAG for each category using the 'is_a' relationships 
-    *forced*: this function will store the dags as an edgelist for faster parsing
-        If forced is true, it will overwrite those
+    *master_root*: for HPO, the master_root is HP:0000001 ("All")
     
     *returns*: a dictionary containing a DAG for each of the 3 GO categories 'C', 'F', and 'P'
     """
-    global id_to_name, name_to_id, goid_to_category
+    global id_to_name
+    global name_to_id
+    global goid_to_category  # mapping from a GO term ID and the category it belongs to ('C', 'F' or 'P')
 
-    dag_edgelist_file = obo_file.replace(".obo", "-isa-edgelist.txt")
-    goid_names_file = obo_file.replace(".obo", "-names.txt")
-    if not forced and os.path.isfile(dag_edgelist_file) and os.path.isfile(goid_names_file):
-        print("Reading GO dags from %s" % (dag_edgelist_file))
-        go_dags = {}
-        for c in ['C', 'F', 'P']:
-            go_dags[c] = nx.DiGraph()
-        with open(dag_edgelist_file, 'r') as f:
-            for line in f:
-                if line[0] == '#':
-                    continue
-                g1, g2, c = line.rstrip().split('\t')[:3]
-                go_dags[c].add_edge(g1, g2)
+    print("Reading GO OBO file from %s" % (obo_file))
+    # obonet returns a networkx MultiDiGraph object containing all of the relationships in the ontology
+    graph = obonet.read_obo(obo_file)
+    # build a mapping from the GO term IDs to the name of the GO term
+    id_to_name = {id_: data['name'] for id_, data in graph.nodes(data=True)}
+    name_to_id = {data['name']: id_ for id_, data in graph.nodes(data=True)}
+    goid_to_category = {} 
+    print("\t%d nodes, %d edges" % (graph.number_of_nodes(),graph.number_of_edges()))
 
-        for c, dag in go_dags.items():
-            print("\tDAG for %s has %d nodes, %d edges" % (c, dag.number_of_nodes(), dag.number_of_edges()))
-            # also set the category for each GO term
-            for n in dag.nodes():
-                goid_to_category[n] = c
+    # make sure this really is a DAG
+    if nx.is_directed_acyclic_graph(graph) is False:
+        print("\tWarning: graph is not a dag")
 
-        with open(goid_names_file, 'r') as f:
-            for line in f:
-                if line[0] == '#':
-                    continue
-                goid, name, c = line.rstrip().split('\t')[:3]
-                name_to_id[name] = goid
-                id_to_name[goid] = name
-    else:
-        print("Reading GO OBO file from %s" % (obo_file))
-        # obonet returns a networkx MultiDiGraph object containing all of the relationships in the ontology
-        graph = obonet.read_obo(obo_file)
-        # build a mapping from the GO term IDs to the name of the GO term
-        id_to_name = {id_: data['name'] for id_, data in graph.nodes(data=True)}
-        name_to_id = {data['name']: id_ for id_, data in graph.nodes(data=True)}
-        print("\t%d nodes, %d edges" % (graph.number_of_nodes(),graph.number_of_edges()))
+    # copied this section from cell 19 of https://github.com/IGACAT/DataPreprocessing/blob/master/scripts/populate_go_terms.ipynb
+    # Extract all edges with "is_a" relationship.
+    # I did not include "part_of" relationships because the molecular_function and biological_process DAGs are not separate from each other if I do
+    is_a_edge_list = []
+    for child, parent, key in graph.out_edges(keys=True):
+        if key == 'is_a':
+            is_a_edge_list.append((child, parent))
 
-        # make sure this really is a DAG
-        if nx.is_directed_acyclic_graph(graph) is False:
-            print("\tWarning: graph is not a dag")
+    # get a is_a-type edge-induced subgraph 
+    is_a_subG = nx.MultiDiGraph(is_a_edge_list)
+    # remove the master root node
+    #is_a_subG.remove_node(master_root)
+    go_dags = {}
+    # there are 3 weakly_connected_components. One for each category
+    for wcc in nx.weakly_connected_components(is_a_subG):
+        G = is_a_subG.subgraph(wcc)
 
-        # copied this section from cell 19 of https://github.com/IGACAT/DataPreprocessing/blob/master/scripts/populate_go_terms.ipynb
-        # Extract all edges with "is_a" relationship.
-        # I did not include "part_of" relationships because the molecular_function and biological_process DAGs are not separate from each other if I do
-        is_a_edge_list = []
-        for child, parent, key in graph.out_edges(keys=True):
-            if key == 'is_a':
-                is_a_edge_list.append((child, parent))
+        # store this DAG in the dictionary of GO DAGs
+        # find the root node 
+        root_node = None  # find root_node  (no out_edge) 
+        for node in G.nodes():
+            if G.out_degree(node) == 0:
+                root_node = node
+                #print(root_node, id_to_name[node])
+                break
+        c = categories[id_to_name[root_node]]
+        print("\tDAG for %s (%s) has %d nodes" % (c, id_to_name[root_node], len(wcc)))
+        go_dags[c] = G
 
-        # get a is_a-type edge-induced subgraph 
-        is_a_subG = nx.MultiDiGraph(is_a_edge_list)
-        full_to_category = {'cellular_component': 'C', 'biological_process': 'P', 'molecular_function' : 'F'}
-        go_dags = {}
-        # there are 3 weakly_connected_components. One for each category
-        for wcc in nx.weakly_connected_components(is_a_subG):
-            G = is_a_subG.subgraph(wcc)
+        # also set the category for each GO term
+        for n in G.nodes():
+            goid_to_category[n] = c
 
-            # store this DAG in the dictionary of GO DAGs
-            # find the root node 
-            root_node = None  # find root_node  (no out_edge) 
-            for node in G.nodes():
-                if G.out_degree(node) == 0:
-                    root_node = node
-                    #print(root_node, id_to_name[node])
-                    break
-            c = full_to_category[id_to_name[root_node]]
-            print("\tDAG for %s has %d nodes" % (id_to_name[root_node], len(wcc)))
-            go_dags[c] = G
-
-            # also set the category for each GO term
-            for n in G.nodes():
-                goid_to_category[n] = c
-        print("\twriting dags to %s" % (dag_edgelist_file))
-        with open(dag_edgelist_file, 'w') as out:
-            out.write("#child\tparent\thierarchy\n")
-            for c, dag in go_dags.items():
-                out.write(''.join("%s\t%s\t%s\n" % (g1, g2, c) for g1, g2 in dag.edges()))
-
-        # also write the names to a file
-        print("\twriting goid names to %s" % (goid_names_file))
-        with open(goid_names_file, 'w') as out:
-            for goid in id_to_name:
-                out.write("%s\t%s\t%s\n" % (goid, id_to_name[goid], goid_to_category[goid]))
     return go_dags
 
 
@@ -223,32 +180,14 @@ def parse_gaf_file(gaf_file, pos_neg_ec=[], rem_neg_ec=[], ignore_ec=[]):
     num_pos_neg_ann = 0
     num_rem_neg_ann = 0
     num_ignored_ann = 0 
-    num_not_uniprot = 0
-    num_ev_code_unk = 0
-    # also print out the unknown evidence codes
-    ev_code_unk = set() 
 
     # if they pass in a GAF file:
-    open_func = gzip.open if '.gz' in gaf_file else open
-    with open_func(gaf_file, 'r') as f:
+    with open(gaf_file, 'r') as f:
         for line in f:
-            line = line.decode() if '.gz' in gaf_file else line
-            cols = line.rstrip().split('\t')
-            # if the prot is not a uniprot ID, then skip it
-            prot_type = cols[0]
-            if prot_type != "UniProtKB":
-                num_not_uniprot += 1
+            if line[0] == '#' or line[0] == '!':
                 continue
+            cols = line.rstrip().split('\t')
             prot = cols[1]
-            # UPDATE 2019-06-11: Some annotations are to specific peptides of UniProt IDs
-            # For example: A0A219CMY0:PRO_0000443731
-            # For now, just take the UniProt ID of the annotation
-            if ':' in prot:
-                prot = prot.split(':')[0]
-            # also remove splice variants if they're specified
-            # for example: O00499-7
-            if '-' in prot:
-                prot = prot.split('-')[0]
             all_prots.add(prot)
             goid = cols[4]
             evidence_code = cols[6]
@@ -271,14 +210,8 @@ def parse_gaf_file(gaf_file, pos_neg_ec=[], rem_neg_ec=[], ignore_ec=[]):
                 num_rem_neg_ann += 1
                 goid_rem_neg_prots[goid].add(prot)
             else:
-                num_ev_code_unk += 1 
-                ev_code_unk.add(evidence_code)
-                #print("WARNING: evidence_code '%s' not recognized" % (evidence_code))
+                print("WARNING: evidence_code '%s' not recognized" % (evidence_code))
 
-    if len(ev_code_unk) > 0:
-        print("WARNING: evidence_codes not recognized: %s" % (', '.join(sorted(ev_code_unk))))
-        print("\t%d unknown evidence code entries ignored" % (num_ev_code_unk))
-    print("\t%d non-uniprot entries ignored" % (num_not_uniprot))
     print("\t%d NOT annotations ignored" % (num_not_ann)) 
     print("\t%d \"pos_neg_ec\" annotations" % (num_pos_neg_ann))
     print("\t%d \"rem_neg_ec\" annotations" % (num_rem_neg_ann))
@@ -335,11 +268,11 @@ def setup_evidence_code_categories(pos_neg_ec=[], rem_neg_ec=[], ignore_ec=[]):
 
     print()
     print("pos_neg_ec (used to assign positive and negative examples):" +
-          "\n\t'%s'" % (','.join(pos_neg_ec))) 
+          "\n\t'%s'" % ("','".join(pos_neg_ec))) 
     print("rem_neg_ec (used to remove negative examples):" +
-          "\n\t'%s'" % (','.join(rem_neg_ec))) 
+          "\n\t'%s'" % ("','".join(rem_neg_ec))) 
     print("ignore_ec (ignored completely when assigning examples):" +
-          "\n\t'%s'" % (','.join(ignore_ec)))
+          "\n\t'%s'" % ("','".join(ignore_ec)))
     print()
 
     # make sure the sets are non-overlapping
@@ -460,7 +393,7 @@ def assign_all_pos_neg(high_freq_goids, G, revG, annotated_prots, all_prots, rem
     *goid_neg*: dictionary of a set of negative examples for each GO term
     *goid_unk*: dictionary of a set of unknown examples for each GO term
     """
-    #global id_to_name, name_to_id
+    global id_to_name, name_to_id
 
     print("Getting positives and negatives for %d GO terms" % (len(high_freq_goids)))
 
@@ -496,7 +429,7 @@ def build_pos_neg_table(high_freq_goids, goid_pos, goid_neg, goid_unk, summary_o
     *df*: the table as a pandas DataFrame 
     *df_summary*: a table containing the # of positive, negative and unknown examples for each GO term
     """
-    #global id_to_name, name_to_id, goid_to_category
+    global id_to_name, name_to_id, goid_to_category
 
     if summary_only is False:
         print("Building a table with positive/negative/unknown assignments for each protein-goterm pair")
@@ -533,10 +466,8 @@ def build_pos_neg_table(high_freq_goids, goid_pos, goid_neg, goid_unk, summary_o
         return df_summary
 
 
-def main(obo_file, gaf_file, out_pref=None, cutoff=1000, write_table=False,
+def main(obo_file, gaf_file, out_pref, cutoff=1000, write_table=False,
         pos_neg_ec=[], rem_neg_ec=[], ignore_ec=[]):
-    global id_to_name, name_to_id, goid_to_category
-
     # first parse the gaf and obo files
     direct_prot_goids_by_c, direct_goid_prots, direct_goid_rem_neg_prots, all_prots = parse_gaf_file(
             gaf_file, pos_neg_ec, rem_neg_ec, ignore_ec)
@@ -544,7 +475,6 @@ def main(obo_file, gaf_file, out_pref=None, cutoff=1000, write_table=False,
 
     # keep track of the summary stats for each category, and combine them into one table in the end
     df_summaries = pd.DataFrame()
-    results = {}
 
     # assign the positives, negatives and unknowns for biological process and molecular function
     for c in ["P", "F"]:
@@ -568,82 +498,101 @@ def main(obo_file, gaf_file, out_pref=None, cutoff=1000, write_table=False,
         # keep track of the set of proteins with at least 1 annotation in this category to assign negatives later
         goid_pos, goid_neg, goid_unk = assign_all_pos_neg(high_freq_goids, G, revG, annotated_prots, all_prots, rem_negG=rem_negG)
 
-        category = {"C": "cc", "P": "bp", "F": "mf"}
-        results[category[c]] = (goid_pos, goid_neg, goid_unk)
         # now write it to a file
+        category = {"C": "cc", "P": "bp", "F": "mf"}
         if write_table is True:
             # build a table containing a positive/negative/unknown assignment for each protein-goterm pair
             df, df_summary = build_pos_neg_table(high_freq_goids, goid_pos, goid_neg, goid_unk)
             # combine the summary stats for all categories into one table
             df_summaries = pd.concat([df_summaries, df_summary])
 
-            if out_pref is not None:
-                out_file = "%spos-neg-%s-%d.tsv" % (out_pref, category[c], cutoff)
-                print("Writing table containing positive/negative/unknown assignments to %s" % (out_file))
-                df.to_csv(out_file, sep="\t")
-        # TODO 
-        #elif write_matrix is True:
-        #    ann_matrix, goids = build_ann_matrix(goid_pos, goid_neg, prots)
-        #    out_file = "%spos-neg-%s-%d.npz" % (out_pref, category[c], cutoff)
-        #    write_ann_matrix(out_pref, ann_matrix, goids)
+            out_file = "%spos-neg-%s-%d.tsv" % (out_pref, category[c], cutoff)
+            print("Writing table containing positive/negative/unknown assignments to %s" % (out_file))
+            df.to_csv(out_file, sep="\t")
         else:
             # build a summary table of the pos/neg/unk assignments
             df_summary = build_pos_neg_table(high_freq_goids, goid_pos, goid_neg, goid_unk, summary_only=True)
             # combine the summary stats for all categories into one table
             df_summaries = pd.concat([df_summaries, df_summary])
-            if out_pref is not None:
-                out_file = "%spos-neg-%s-%d-list.tsv" % (out_pref, category[c], cutoff)
-                print("Writing file containing positive/negative assignments to %s" % (out_file))
-                with open(out_file, 'w') as out:
-                    out.write("#goid\tpos/neg assignment\tprots\n")
-                    for goid in high_freq_goids:
-                        out.write("%s\t1\t%s\n" % (goid, ','.join(goid_pos[goid])))
-                        out.write("%s\t-1\t%s\n" % (goid, ','.join(goid_neg[goid])))
+            out_file = "%spos-neg-%s-%d-list.tsv" % (out_pref, category[c], cutoff)
+            print("Writing file containing positive/negative assignments to %s" % (out_file))
+            with open(out_file, 'w') as out:
+                out.write("#goid\tpos/neg assignment\tprots\n")
+                for goid in high_freq_goids:
+                    out.write("%s\t1\t%s\n" % (goid, ','.join(goid_pos[goid])))
+                    out.write("%s\t-1\t%s\n" % (goid, ','.join(goid_neg[goid])))
 
-    if out_pref is not None:
-        output_summary_file = "%spos-neg-%d-summary-stats.tsv" % (out_pref, cutoff)
-        # maybe make this into an option later instead of always writing it
-        #if output_summary_file is not None:
-        print("Writing summary table of # of positive, negative and unknown examples for each GO term to: %s" % (output_summary_file))
-        df_summaries.to_csv(output_summary_file, sep='\t')
-
-    return results, df_summaries
+    output_summary_file = "%spos-neg-%d-summary-stats.tsv" % (out_pref, cutoff)
+    # maybe make this into an option later instead of always writing it
+    #if output_summary_file is not None:
+    print("Writing summary table of # of positive, negative and unknown examples for each GO term to: %s" % (output_summary_file))
+    df_summaries.to_csv(output_summary_file, sep='\t')
 
 
-def build_ann_matrix(goid_pos, goid_neg, prots):
-    """
-    Function to build a sparse matrix out of the annotations
-    """
+def parse_args(args):
+    ## Parse command line args.
+    description = """
+This script takes the annotations in a GAF file, and the GO DAG and assigns 
+every gene as either a positive (1), negative (-1) or unknown (0) for each GO term with > cutoff annotations.
+Writes two tab-separated tables containing the assignments, one for BP and one for MF, where the rows are genes, 
+and the columns are GO term IDs. Also writes a summary statistics table
+"""
+    usage = '%prog [options] '
+    parser = OptionParser(usage=usage, description=description)
+    parser.add_option('-g', '--gaf-file', type='string',
+                      help="File containing GO annotations in GAF format. Required")
+    parser.add_option('-b', '--obo-file', type='string', 
+                      help="GO OBO file which contains the GO DAG. Required")
+    #parser.add_option('-n', '--negatives', type='string', default='non-ancestral',
+    #                  help="Types of negatives to generate. Options are: '%s'. Default = 'non-ancestral', See the README file for descriptions of these options." % ("', '".join(NEGATIVES_OPTIONS)))
+    parser.add_option('-c', '--cutoff', type='int', default=1000,
+                      help="GO terms having > cutoff positive instances (proteins) are kept. Default=1000")
+    parser.add_option('-o', '--out-pref', type='string', 
+                      help="Prefix used to write a table of positives, negatives, and unknowns for each GO category." +
+                      "Writes an output file for BP and MF: <out-pref>pos-neg-<cutoff>-P.tsv and <out-pref>pos-neg-<cutoff>-F.tsv")
+    # writing the big pos/neg/unk assignment matrix is taking too long. 
+    # instead, write the pos/neg prots for each GO term to a file
+    parser.add_option('', '--write-table', action='store_true', default=False,
+                      help="write the pos/neg/unk assignments to a table rather than the default comma-separated list of prots")
+    parser.add_option('', '--pos-neg-ec', type='string',
+                      help="Comma-separated list of evidence codes used to assign positive and negative examples. " +
+                      "If none are specified, all codes not in the two other categories " + 
+                      "(--rem-neg-ec and --ignore-ec) will be used by default.")
+    parser.add_option('', '--rem-neg-ec', type='string',
+                      help="Comma-separated list of evidence codes used to remove negative examples. " + 
+                      "Specifically, If a protein would be labelled as a negative example for a given term " + 
+                      "but is annotated with a 'rem_neg' evidence code for the term, it is instead labelled as unknown. " +
+                      "If none are specified, but --pos-neg-ec codes are given, " +
+                      "all codes not in the other two categories will be put in this category by default.")
+    parser.add_option('', '--ignore-ec', type='string',
+                      help="Comma-separated list of evidence codes where annotations with the specified codes will be ignored when parsing the GAF file. " +
+                      "For example, specifying 'IEA' will skip all annotations with an evidence code 'IEA'. " +
+                      "If both --pos-neg-ec and --rem-neg-ec codes are given, everything else will be ignored by default.")
 
-    goids = sorted(goid_pos.keys())
-    node2idx = {prot: i for i, prot in enumerate(prots)}
+    (opts, args) = parser.parse_args(args)
 
-    i_list = []
-    j_list = []
-    data = []
-    num_pos = 0
-    num_neg = 0
-    # limit the annotations to the proteins which are in the networks
-    prots_set = set(prots)
-    for j, goid in enumerate(goids):
-        for prot in goid_pos[goid] & prots_set:
-            i_list.append(node2idx[prot])
-            j_list.append(j)
-            data.append(1)
-            num_pos += 1
-        for prot in goid_neg[goid] & prots_set:
-            i_list.append(node2idx[prot])
-            j_list.append(j)
-            data.append(-1)
-            num_neg += 1
-    print("\t%d annotations. %d positive, %d negatives" % (len(data), num_pos, num_neg))
+    if opts.gaf_file is None or opts.obo_file is None or opts.out_pref is None:
+        parser.print_help()
+        sys.exit("\n--gaf-file (-g), --obo-file (-b), and --out-pref (-o) are required")
 
-    # convert it to a sparse matrix 
-    print("Building a sparse matrix of annotations")
-    ann_matrix = sparse.coo_matrix((data, (i_list, j_list)), shape=(len(prots), len(goids)), dtype=float).tocsr()
-    print("\t%d pos/neg annotations" % (len(ann_matrix.data)))
-    ann_matrix = ann_matrix.transpose()
-    return ann_matrix, goids
+    # make sure all of the specified codes are actually GO evidence codes
+    codes = []
+    for codes_option in [opts.pos_neg_ec, opts.rem_neg_ec, opts.ignore_ec]:
+        if codes_option is not None:
+            codes += codes_option.split(',')
+    non_evidence_codes = set(codes).difference(set(ALL_EVIDENCE_CODES))
+    if len(non_evidence_codes) > 0:
+        sys.stderr.write("ERROR: the specified code(s) are not GO evidence codes: '%s'\n" % ("', '".join(non_evidence_codes)))
+        sys.stderr.write("Accepted evidence codes: '%s'\n" % ("', '".join(ALL_EVIDENCE_CODES)))
+        sys.exit(1)
+
+    # check if the output prefix is writeable
+    out_dir = os.path.dirname(opts.out_pref)
+    if not os.path.isdir(out_dir):
+        sys.stderr.write("ERROR: output directory %s specified by --out-pref doesn't exist\n" % (out_dir))
+        sys.exit(1)
+
+    return opts, args
 
 
 if __name__ == "__main__":

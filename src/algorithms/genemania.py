@@ -18,7 +18,7 @@ def setup_laplacian(W):
     return L
 
 
-def runGeneMANIA(L, y, tol=1e-05, verbose=False):
+def runGeneMANIA(L, y, tol=1e-05, Milu=None, verbose=False):
     """
     *L*: Laplacian of the original network
     *y*: vector of positive and negative assignments
@@ -36,12 +36,20 @@ def runGeneMANIA(L, y, tol=1e-05, verbose=False):
     #num_neg = len((y < 0).nonzero()[1])
     num_pos = len(np.where(y == 1)[0])
     num_neg = len(np.where(y == -1)[0])
+    
+    print("Positive annotations: {}, negative annotations: {}".format(num_pos, num_neg))
     if num_pos == 0:
         print("WARNING: No positive examples given. Skipping.")
         return np.zeros(len(y)), 0,0,0
-    # taken from the GeneMANIA paper
-    k = (num_pos - num_neg) / float(num_pos + num_neg)
-    y[np.where(y == 0)[0]] = k
+    # if there are no negative examples, 
+    # then leave the unknown examples at 0
+    if num_neg == 0:
+        pass
+    # otherwise, set the unknown examples to the value k
+    else:
+        # taken from the GeneMANIA paper
+        k = (num_pos - num_neg) / float(num_pos + num_neg)
+        y[np.where(y == 0)[0]] = k
 
     # this measures the amount of time taken by all processors
     # and Conjugate Gradient is paralelized
@@ -58,7 +66,7 @@ def runGeneMANIA(L, y, tol=1e-05, verbose=False):
         num_iters += 1
 
     # use scipy's conjugate gradient solver
-    f, info = cg(M, y, tol=tol, callback=callback)
+    f, info = cg(M, y, tol=tol, M=Milu, callback=callback)
     process_time = time.process_time() - start_process_time
     wall_time = time.time() - start_wall_time
     if verbose:

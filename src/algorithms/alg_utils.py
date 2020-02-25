@@ -125,10 +125,11 @@ def setup_sparse_network(network_file, node2idx_file=None, forced=False):
             print("### Matrix converted to symmetric.")
         #name = os.path.basename(net_file)
         print("\twriting sparse matrix to %s" % (sparse_net_file))
-        sp.save_npz(sparse_net_file, W)
+        #sp.save_npz(sparse_net_file, W)
         print("\twriting node2idx labels to %s" % (node2idx_file))
-        with open(node2idx_file, 'w') as out:
-            out.write(''.join(["%s\t%d\n" % (prot,i) for i, prot in enumerate(prots)]))
+        
+        #with open(node2idx_file, 'w') as out:
+        #    out.write(''.join(["%s\t%d\n" % (prot,i) for i, prot in enumerate(prots)]))
     else:
         print("Network %s not found. Quitting" % (network_file))
         sys.exit(1)

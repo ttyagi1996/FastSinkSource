@@ -10,11 +10,13 @@ import src.algorithms.apt_birg_rank_runner as birgrank
 import src.algorithms.sinksource_bounds
 from src.algorithms.aptrank_birgrank.birgrank import birgRank
 import src.algorithms.aptrank_birgrank.run_birgrank as run_birgrank
+import src.algorithms.tissue_props_runner as tissue_props
+import src.algorithms.logistic_regression_runner as logistic_regression
 #import src.algorithms.ranks_runner as ranks
 #import src.algorithms.hemdag_runner as hemdag
-#import src.algorithms.svm_runner as svm
+import src.algorithms.svm_runner as svm
 #import src.algorithms.digraph_fss_runner as digraph_fss
-#import src.algorithms.fss_parent_child_runner as parent_child
+import src.algorithms.fss_parent_child_runner as parent_child
 #import src.algorithms.genemania_parent_child_runner as genemania_pc
 #import src.algorithms.sinksource_bounds
 #from src.algorithms.aptrank_birgrank.birgrank import birgRank
@@ -33,14 +35,17 @@ LibMapper = {
     'local': fastsinksource,
     'localplus': fastsinksource,
     'genemania': genemania,
+    'genemaniaplus': genemania,
     'aptrank': birgrank,
     'birgrank': birgrank,
     #'ranks' : ranks,
     #'hemdag' : hemdag,
     #'sanity' : sanity,
-    #'svm' : svm,
+    'svm' : svm,
     #'digraph_fss' : digraph_fss,
-    #'parent_child' : parent_child,
+    'parent_child' : parent_child,
+    'tissue_props': tissue_props,
+    'logistic_regression' : logistic_regression
     #'genemania_pc' : genemania_pc,
 }
 
@@ -72,7 +77,6 @@ class Runner(object):
         params.pop('should_run', None)  # remove the should_run parameter
         self.params = params
         self.kwargs = kwargs
-        self.out_pref = kwargs.get('out_pref', '')
         self.verbose = kwargs.get('verbose', False) 
         self.forced = kwargs.get('forcealg', False) 
         # for term-based algorithms, can limit the goids for which they will be run
@@ -88,9 +92,11 @@ class Runner(object):
 
         # keep track of the weighting method for writing to the output file later
         self.setupParamsStr(net_obj.weight_str, params, name)
+        self.out_pref = kwargs.get('out_pref', self.out_dir+'pred-scores'+self.params_str)
 
 
-    # if the method is not in Python and needs to be called elsewhere, use this
+    # if the algorithm is not inmplemented in Python (e.g., MATLAB, R)
+    # use this function to setup files and such
     def setupInputs(self):
         return LibMapper[self.name].setupInputs(self)
 

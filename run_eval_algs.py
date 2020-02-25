@@ -96,7 +96,7 @@ def setup_opts():
     # TODO finish adding this option
     #group.add_argument('-T', '--ground-truth-file', type=str,
     #                 help="File containing true annotations with which to evaluate predictions")
-    group.add_argument('--postfix', type=str, default='',
+    group.add_argument('--postfix', type=str, 
             help="String to add to the end of the output file name(s)")
     group.add_argument('--forcealg', action="store_true", default=False,
             help="Force re-running algorithms if the output files already exist")
@@ -113,8 +113,15 @@ def run(config_map, **kwargs):
     input_dir = input_settings['input_dir']
     alg_settings = config_map['algs']
     output_settings = config_map['output_settings']
+    postfix = kwargs.get("postfix")
     # combine the evaluation settings in the config file and the kwargs
     kwargs.update(config_map['eval_settings'])
+    # if specified, use this postfix, meaning overwrite the postfix from the yaml file
+    if postfix is not None:
+        kwargs['postfix'] = postfix
+    # otherwise use the default empty string
+    elif kwargs.get('postfix') is None:
+        kwargs['postfix'] = ""
 
     for dataset in input_settings['datasets']:
         # add options specified for this dataset to kwargs  
@@ -179,9 +186,16 @@ def setup_net(input_dir, dataset, **kwargs):
     if 'net_files' in dataset:
         net_files = ["%s/%s/%s" % (input_dir, dataset['net_version'], net_file) for net_file in dataset['net_files']]
     unweighted = dataset['net_settings'].get('unweighted', False) if 'net_settings' in dataset else False
-    if dataset.get('multi_net',False) is True: 
+    # if multiple networks are passed in, then set multi_net to True automatically
+    if (net_files is not None and len(net_files) > 1) or 'string_net_files' in dataset:
+        if dataset.get('multi_net') is False:
+            print("WARNING: multiple networks were passed in. Setting 'multi_net' to True")
+        dataset['multi_net'] = True
+
+    # parse and store the networks 
+    if dataset.get('multi_net') is True: 
         # if multiple file names are passed in, then map each one of them
-        if isinstance(net_files, list) or 'string_net_files' in dataset:
+        if net_files is not None or 'string_net_files' in dataset:
             string_net_files = ["%s/%s/%s" % (input_dir, dataset['net_version'], string_net_file) for string_net_file in dataset['string_net_files']]
             string_nets = None 
             if 'string_nets' in dataset['net_settings']:
@@ -227,23 +241,31 @@ def load_annotations(prots, dataset, input_dir, **kwargs):
     # or the --goterm command-line option
     only_functions_file = None
     # if specific goterms are passed in_then ignore the only functions file
-    if kwargs['goterm'] is None and 'only_functions_file' in dataset and dataset['only_functions_file'] != '':
+    #if kwargs['goterm'] is None and 'only_functions_file' in dataset and dataset['only_functions_file'] != '':
+    # for SWSN to be correct, cannot limit to a single term with kwargs['goterm']
+    # TODO add a 'test' option or something to be able to limit to a single term
+    if 'only_functions_file' in dataset and dataset['only_functions_file'] != '':
         only_functions_file = "%s/%s" % (input_dir, dataset['only_functions_file'])
     selected_terms = alg_utils.select_goterms(
             only_functions_file=only_functions_file, goterms=kwargs['goterm']) 
 
+
+    # write/load the processed annotation matrix in a pos_neg_file version of the network folder
+    # TODO this is hacky, but works for now
+    pos_neg_str = dataset['pos_neg_file'] \
+                       .replace('/','-').replace('pos-neg-','') \
+                       .replace('.txt','').replace('.tsv','').replace('.gz','')
+    pos_neg_str += '-Yneg' if kwargs.get('youngs_neg') else ''
+    sparse_ann_file = "%s/%s/sparse-anns/%s.npz" % (input_dir, dataset['net_version'], pos_neg_str)
+
     # now build the annotation matrix
     pos_neg_file = "%s/%s" % (input_dir, dataset['pos_neg_file'])
     obo_file = "%s/%s" % (input_dir, dataset['obo_file'])
-    dag_matrix, ann_matrix, goids, ann_prots = setup.create_sparse_ann_file(
-            obo_file, pos_neg_file, **kwargs)
-    #ann_matrix, goids = setup.setup_sparse_annotations(pos_neg_file, selected_terms, prots)
-    ann_obj = setup.Sparse_Annotations(dag_matrix, ann_matrix, goids, ann_prots)
-    # so that limiting the terms won't make a difference, apply youngs_neg here
-    if kwargs.get('youngs_neg'):
-        ann_obj = setup.youngs_neg(ann_obj, **kwargs)
+    ann_obj = setup.create_sparse_ann_and_align_to_net(
+            obo_file, pos_neg_file, sparse_ann_file, prots, **kwargs)
+
     if kwargs.get('leaf_terms_only'):
-        terms = selected_terms if selected_terms is not None else goids
+        terms = selected_terms if selected_terms is not None else ann_obj.goids
         # limit the terms to only those that are the most specific (i.e., leaf terms),
         # meaning remove the ancestors of all terms 
         leaf_terms = go_utils.get_most_specific_terms(terms, ann_obj=ann_obj)
@@ -255,23 +277,25 @@ def load_annotations(prots, dataset, input_dir, **kwargs):
     if selected_terms is not None:
         ann_obj.limit_to_terms(selected_terms)
     else:
-        selected_terms = goids
-    # align the ann_matrix prots with the prots in the network
-    ann_obj.reshape_to_prots(prots)
+        selected_terms = ann_obj.goids
 
     eval_ann_obj = None
-    # also check if a evaluation pos_neg_file was given
+    # also check if an evaluation pos_neg_file was given
     if dataset.get('pos_neg_file_eval', '') != '':
+        pos_neg_str = dataset['pos_neg_file_eval'] \
+                        .replace('/','-').replace('pos-neg-','') \
+                        .replace('.txt','').replace('.tsv','').replace('.gz','')
+        pos_neg_str += '-Yneg' if kwargs.get('youngs_neg') else ''
+        sparse_ann_file = "%s/%s/sparse-anns/%s.npz" % (input_dir, dataset['net_version'], pos_neg_str)
         pos_neg_file_eval = "%s/%s" % (input_dir, dataset['pos_neg_file_eval'])
-        dag_matrix, ann_matrix, goids, ann_prots = setup.create_sparse_ann_file(
-                obo_file, pos_neg_file_eval, **kwargs)
-        #ann_matrix, goids = setup.setup_sparse_annotations(pos_neg_file_eval, selected_terms, prots)
-        eval_ann_obj = setup.Sparse_Annotations(dag_matrix, ann_matrix, goids, ann_prots)
-        if kwargs.get('youngs_neg'):
-            eval_ann_obj = setup.youngs_neg(eval_ann_obj, **kwargs)
+        eval_ann_obj = setup.create_sparse_ann_and_align_to_net(
+                obo_file, pos_neg_file_eval, sparse_ann_file, prots, **kwargs)
         # also limit the terms in the eval_ann_obj to those from the pos_neg_file
         eval_ann_obj.limit_to_terms(selected_terms)
+
         eval_ann_obj.reshape_to_prots(prots)
+
+    ann_obj.selected_terms = selected_terms
     return selected_terms, ann_obj, eval_ann_obj
 
 
@@ -326,14 +350,17 @@ def run_algs(alg_runners, **kwargs):
     """
     # first check to see if the algorithms have already been run
     # and if the results should be overwritten
+    for run_obj in alg_runners:
+        out_file = "%s/pred-scores%s.txt" % (run_obj.out_dir, run_obj.params_str)
+        run_obj.out_file = out_file
+        run_obj.out_pref = out_file.replace(".txt","")
     if kwargs['forcealg'] is True or kwargs['num_pred_to_write'] == 0:
         runners_to_run = alg_runners
     else:
         runners_to_run = []
         for run_obj in alg_runners:
-            out_file = "%s/pred%s.txt" % (run_obj.out_dir, run_obj.params_str)
-            if os.path.isfile(out_file):
-                print("%s already exists. Use --forcealg to overwite" % (out_file))
+            if os.path.isfile(run_obj.out_file):
+                print("%s already exists. Use --forcealg to overwite" % (run_obj.out_file))
             else:
                 runners_to_run.append(run_obj)
 
@@ -366,13 +393,13 @@ def run_algs(alg_runners, **kwargs):
                 positives = (y > 0).nonzero()[1]
                 num_pred_to_write[run_obj.goids[i]] = len(positives) * kwargs['factor_pred_to_write']
         if num_pred_to_write != 0:
-            out_file = "%s/pred%s.txt" % (run_obj.out_dir, run_obj.params_str)
             # TODO generate the output file paths in the runner object
             #out_file = run_obj.out_file
-            utils.checkDir(os.path.dirname(out_file)) 
+            utils.checkDir(os.path.dirname(run_obj.out_file)) 
             write_output(run_obj.goid_scores, run_obj.ann_obj.goids, run_obj.ann_obj.prots,
-                         out_file, num_pred_to_write=num_pred_to_write)
+                         run_obj.out_file, num_pred_to_write=num_pred_to_write)
 
+    eval_loso.write_stats_file(runners_to_run, params_results)
     print(params_results)
     print("Finished")
 

@@ -149,7 +149,7 @@ def evaluate_ground_truth(
             out.write("#goid\tprec\trec\tnode\tscore\tidx\tpos/neg\n")
             #for goid, (prec, rec, pos_neg_stats) in sorted(goid_prec_rec.items(), key=goid_num_pos.get, reverse=True):
             for goid, (prec, rec, pos_neg_stats) in goid_prec_rec.items():
-                out.write(''.join(["%s\t%0.4f\t%0.4f\t%s\t%0.4f\t%d\t%d\n" % (
+                out.write(''.join(["%s\t%0.4f\t%0.4f\t%s\t%0.4e\t%d\t%d\n" % (
                     goid, p, r, prots[n], s, idx, pos_neg) for p,r,(n,s,idx,pos_neg,_) in zip(prec, rec, pos_neg_stats)]))
 
 
@@ -239,6 +239,28 @@ def compute_fmax(prec, rec, fmax_idx=False):
         return max(f_measures), idx
     else:
         return max(f_measures)
+
+
+def compute_fmax_ratio(prec, rec):
+    
+    print(rec)
+    print(prec)
+
+    print(rec[-1])
+    print(prec[-1])
+
+    final_recall = rec[-1]
+    final_precision = prec[-1]
+
+    random_predictor = (2*final_precision*final_recall)/(final_precision+final_recall)
+
+    fmax = compute_fmax(prec, rec)
+
+    fmax_ratio = fmax/random_predictor
+
+    return fmax_ratio
+
+
 
 
 def compute_avgp(prec, rec):

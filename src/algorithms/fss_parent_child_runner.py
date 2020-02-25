@@ -242,6 +242,11 @@ def run(run_obj):
 
         #NOTE: the 3rd quarter of the new adjacency matrix is set to 0, since we do not consider any edges to the parent network from the child network
         
+        
+        for i in tqdm(range(net_matrix.shape[0], W_combined.shape[0])):
+            W_combined[i, :net_matrix.shape[1]] = params['weight']
+
+
         # the 4th quarter represents the links between the nodes in the parent network layer
         # this is the same as the original network we consider
         print("Setting the fourth quarter of the new adjacency matrix")
