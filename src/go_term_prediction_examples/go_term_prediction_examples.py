@@ -16,8 +16,79 @@ ALL_EVIDENCE_CODES = ['EXP','IDA','IPI','IMP','IGI','IEP','ISS','ISO','ISA','ISM
 go_categories = {'cellular_component': 'C', 'biological_process': 'P', 'molecular_function' : 'F'}
 
 
+<<<<<<< HEAD
 def parse_obo_file_and_build_dags(obo_file, 
         categories=go_categories, master_root=None):
+=======
+
+def parse_args(args):
+    ## Parse command line args.
+    description = """
+This script takes the annotations in a GAF file, and the GO DAG and assigns 
+every gene as either a positive (1), negative (-1) or unknown (0) for each GO term with >= cutoff annotations.
+Writes two tab-separated tables containing the assignments, one for BP and one for MF, where the rows are genes, 
+and the columns are GO term IDs. Also writes a summary statistics table
+"""
+    usage = '%prog [options] '
+    parser = OptionParser(usage=usage, description=description)
+    parser.add_option('-g', '--gaf-file', type='string',
+                      help="File containing GO annotations in GAF format. Required")
+    parser.add_option('-b', '--obo-file', type='string', 
+                      help="GO OBO file which contains the GO DAG. Required")
+    #parser.add_option('-n', '--negatives', type='string', default='non-ancestral',
+    #                  help="Types of negatives to generate. Options are: '%s'. Default = 'non-ancestral', See the README file for descriptions of these options." % ("', '".join(NEGATIVES_OPTIONS)))
+    parser.add_option('-c', '--cutoff', type='int', default=1000,
+                      help="GO terms having >= cutoff positive instances (proteins) are kept. Default=1000")
+    parser.add_option('-o', '--out-pref', type='string', 
+                      help="Prefix used to write a table of positives, negatives, and unknowns for each GO category." +
+                      "Writes an output file for BP and MF: <out-pref>pos-neg-<cutoff>-P.tsv and <out-pref>pos-neg-<cutoff>-F.tsv")
+    # writing the big pos/neg/unk assignment matrix is taking too long. 
+    # instead, write the pos/neg prots for each GO term to a file
+    parser.add_option('', '--write-table', action='store_true', default=False,
+                      help="write the pos/neg/unk assignments to a table rather than the default comma-separated list of prots")
+    parser.add_option('', '--pos-neg-ec', type='string',
+                      help="Comma-separated list of evidence codes used to assign positive and negative examples. " +
+                      "If none are specified, all codes not in the two other categories " + 
+                      "(--rem-neg-ec and --ignore-ec) will be used by default.")
+    parser.add_option('', '--rem-neg-ec', type='string',
+                      help="Comma-separated list of evidence codes used to remove negative examples. " + 
+                      "Specifically, If a protein would be labelled as a negative example for a given term " + 
+                      "but is annotated with a 'rem_neg' evidence code for the term, it is instead labelled as unknown. " +
+                      "If none are specified, but --pos-neg-ec codes are given, " +
+                      "all codes not in the other two categories will be put in this category by default.")
+    parser.add_option('', '--ignore-ec', type='string',
+                      help="Comma-separated list of evidence codes where annotations with the specified codes will be ignored when parsing the GAF file. " +
+                      "For example, specifying 'IEA' will skip all annotations with an evidence code 'IEA'. " +
+                      "If both --pos-neg-ec and --rem-neg-ec codes are given, everything else will be ignored by default.")
+
+    (opts, args) = parser.parse_args(args)
+
+    if opts.gaf_file is None or opts.obo_file is None or opts.out_pref is None:
+        parser.print_help()
+        sys.exit("\n--gaf-file (-g), --obo-file (-b), and --out-pref (-o) are required")
+
+    # make sure all of the specified codes are actually GO evidence codes
+    codes = []
+    for codes_option in [opts.pos_neg_ec, opts.rem_neg_ec, opts.ignore_ec]:
+        if codes_option is not None:
+            codes += codes_option.split(',')
+    non_evidence_codes = set(codes).difference(set(ALL_EVIDENCE_CODES))
+    if len(non_evidence_codes) > 0:
+        sys.stderr.write("ERROR: the specified code(s) are not GO evidence codes: '%s'\n" % ("', '".join(non_evidence_codes)))
+        sys.stderr.write("Accepted evidence codes: '%s'\n" % ("', '".join(ALL_EVIDENCE_CODES)))
+        sys.exit(1)
+
+    # check if the output prefix is writeable
+    out_dir = os.path.dirname(opts.out_pref)
+    if not os.path.isdir(out_dir):
+        sys.stderr.write("ERROR: output directory %s specified by --out-pref doesn't exist\n" % (out_dir))
+        sys.exit(1)
+
+    return opts, args
+
+
+def parse_obo_file_and_build_dags(obo_file, forced=False):
+>>>>>>> origin/master
     """
     Parse the GO OBO into a networkx MultiDiGraph using obonet.
     Then construct a DAG for each category using the 'is_a' relationships 
@@ -219,14 +290,14 @@ def setup_evidence_code_categories(pos_neg_ec=[], rem_neg_ec=[], ignore_ec=[]):
 def extract_high_freq_goterms(G, goids, annotated_prots, cutoff=1000):
     """
     *G*: GO DAG (networkx DiGraph) with prot->goid edges for each protein's annotations
-    returns a set of GO terms with > cutoff proteins annotated to it 
+    returns a set of GO terms with >= cutoff proteins annotated to it 
     """
     high_freq_go_terms = set() 
     for goid in tqdm(goids):
         anc = nx.ancestors(G, goid)
         # the number of positive annotations for this GO term is the number of proteins that can reach this GO term ID in the gene-goid graph
         # meaning the number of proteins annotated to this term plus those annotated to an ancestral, more specific term
-        if len(anc.intersection(annotated_prots)) > cutoff:
+        if len(anc.intersection(annotated_prots)) >= cutoff:
             high_freq_go_terms.add(goid) 
 
     return high_freq_go_terms
@@ -346,7 +417,7 @@ def assign_all_pos_neg(high_freq_goids, G, revG, annotated_prots, all_prots, rem
 def build_pos_neg_table(high_freq_goids, goid_pos, goid_neg, goid_unk, summary_only=False):
     """
     Builds a table with a positive/negative/unknown (1/-1/0) assignment for each gene-GO term pair. 
-    Rows are the genes and columns are the given high_freq_goids (GO terms with > cutoff proteins annotated) 
+    Rows are the genes and columns are the given high_freq_goids (GO terms with >= cutoff proteins annotated) 
 
     Parameters: 
     *high_freq_goids*: goids for which to get positives and negatives. Should all belong to a single category
@@ -363,7 +434,7 @@ def build_pos_neg_table(high_freq_goids, goid_pos, goid_neg, goid_unk, summary_o
 
     if summary_only is False:
         print("Building a table with positive/negative/unknown assignments for each protein-goterm pair")
-        # build a table with the first column being the genes, and a column for each of the terms with > cutoff annotations indicating 1/-1/0 assignment for each gene
+        # build a table with the first column being the genes, and a column for each of the terms with >= cutoff annotations indicating 1/-1/0 assignment for each gene
         pos_neg_table = defaultdict(dict)
         # build a double dictionary with either 1, -1 or 0 for each GO term protein pair
         # TODO there must be a better pandas method to construct the table
@@ -418,12 +489,12 @@ def main(obo_file, gaf_file, out_pref, cutoff=1000, write_table=False,
         #print("# of prots with at least 1 %s annotation: %d" % (c, len(prot_goids)))
         #print("# of %s GO terms with at 1 protein annotated to it: %d" % (c, len(goid_prots)))
 
-        print("Extracting GO terms with > %d annotations" % (cutoff))
+        print("Extracting GO terms with >= %d annotations" % (cutoff))
         annotated_prots = set(direct_prot_goids_by_c[c].keys())
         high_freq_goids = extract_high_freq_goterms(G, go_dags[c].nodes(), annotated_prots, cutoff=cutoff)
         # also remove biological process, cellular component and molecular function
         high_freq_goids.difference_update(set([name_to_id[name] for name in ["cellular_component", "biological_process", "molecular_function"]]))
-        print("\t%d (out of %d) GO terms have > %d proteins annotated to them" % (len(high_freq_goids), go_dags[c].number_of_nodes(), cutoff))
+        print("\t%d (out of %d) GO terms have >= %d proteins annotated to them" % (len(high_freq_goids), go_dags[c].number_of_nodes(), cutoff))
 
         # keep track of the set of proteins with at least 1 annotation in this category to assign negatives later
         goid_pos, goid_neg, goid_unk = assign_all_pos_neg(high_freq_goids, G, revG, annotated_prots, all_prots, rem_negG=rem_negG)

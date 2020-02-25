@@ -4,6 +4,7 @@ import src.algorithms.fastsinksource as fastsinksource
 import src.algorithms.alg_utils as alg_utils
 from tqdm import tqdm, trange
 from scipy import sparse as sp
+from scipy.sparse.linalg import LinearOperator, spilu
 import numpy as np
 from numpy import load
 import pandas as pd
@@ -31,7 +32,11 @@ def setupInputs(run_obj):
         run_obj.P = None
     else:
         run_obj.P = alg_utils.normalizeGraphEdgeWeights(run_obj.net_obj.W, ss_lambda=run_obj.params.get('lambda', None))
+<<<<<<< HEAD
         run_obj.W = run_obj.net_obj.W
+=======
+        #run_obj.P = alg_utils._net_normalize(run_obj.net_obj.W)
+>>>>>>> origin/master
 
     return
 
@@ -43,8 +48,10 @@ def setup_params_str(weight_str, params, name="fastsinksource"):
     params_str = "%s-l%s" % (weight_str, ss_lambda)
     if name.lower() not in ["local", "localplus"]:
         a, eps, maxi = params['alpha'], params['eps'], params['max_iters']
-        params_str += "-a%s-eps%s-maxi%s" % ( 
-            str_(a), str_(eps), str_(maxi))
+        tol = "-tol%s" % (str_(params['tol'])) if 'tol' in params else ''
+        solver = "-%s" % (params['solver']) if 'solver' in params else ''
+        params_str += "-a%s-eps%s-maxi%s%s%s" % ( 
+            str_(a), str_(eps), str_(maxi), tol, solver)
 
     return params_str
 
@@ -60,6 +67,19 @@ def setupOutputFile(run_obj):
 # nothing to do here
 def setupOutputs(run_obj, **kwargs):
     return
+
+
+#def compute_preconditioner(P):
+#    print("running spilu")
+#    start_process_time = time.process_time()
+#    start_wall_time = time.time()
+#    ilu = spilu(M)
+#    process_time = time.process_time() - start_process_time 
+#    wall_time = time.time() - start_wall_time
+#    print("finished in %0.3f sec, %0.3f process time")
+#    Mx = lambda x: ilu.solve(x)
+#    Milu = LinearOperator(P.shape, Mx)
+#    return Milu
 
 
 def run(run_obj):
@@ -158,6 +178,8 @@ def run(run_obj):
     
     params_results = run_obj.params_results
     P, alg, params = run_obj.P, run_obj.name, run_obj.params
+
+    #if 'solver' in params:
     # make sure the goid_scores matrix is reset
     # because if it isn't empty, overwriting the stored scores seems to be time consuming
     goid_scores = sp.lil_matrix(run_obj.ann_matrix.shape, dtype=np.float)
@@ -188,9 +210,12 @@ def run(run_obj):
         # now actually run the algorithm
         if alg in ["fastsinksource", "fastsinksourceplus", "sinksource", "sinksourceplus"]:
             a, eps, max_iters = params['alpha'], float(params['eps']), params['max_iters']
+            # if a solver is given, it will be used. Otherwise it will use regular power iteration 
+            solver = params.get('solver')
+            tol = float(params['tol']) if 'tol' in params else 1e-5
             scores, process_time, wall_time, iters = fastsinksource.runFastSinkSource(
                 P, positives, negatives=negatives, max_iters=max_iters,
-                eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False))
+                eps=eps, a=a, tol=tol, solver=solver, verbose=run_obj.kwargs.get('verbose', False))
         elif alg in ["local", "localplus"]:
             scores, process_time, wall_time = fastsinksource.runLocal(
                 P, positives, negatives=negatives)
@@ -207,7 +232,7 @@ def run(run_obj):
         if len(run_obj.target_prots) != len(scores):
             #print("\tstoring results for %d target prots" % (len(run_obj.target_prots)))
             mask = np.ones(len(scores), np.bool)
-            mask[run_obj.target_prots] = 0
+            mask[run_obj.target_prots] = False
             scores[mask] = 0
         # 0s are not explicitly stored in lil matrix
         goid_scores[idx] = scores
