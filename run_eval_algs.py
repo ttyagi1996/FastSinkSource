@@ -226,6 +226,7 @@ def load_annotations(prots, dataset, input_dir, **kwargs):
     selected_terms = alg_utils.select_goterms(
             only_functions_file=only_functions_file, goterms=kwargs['goterm']) 
 
+    print(selected_terms)
     # now build the annotation matrix
     pos_neg_file = "%s/%s" % (input_dir, dataset['pos_neg_file'])
     obo_file = "%s/%s" % (input_dir, dataset['obo_file'])
@@ -266,6 +267,7 @@ def load_annotations(prots, dataset, input_dir, **kwargs):
         # also limit the terms in the eval_ann_obj to those from the pos_neg_file
         eval_ann_obj.limit_to_terms(selected_terms)
         eval_ann_obj.reshape_to_prots(prots)
+    ann_obj.selected_terms = selected_terms
     return selected_terms, ann_obj, eval_ann_obj
 
 

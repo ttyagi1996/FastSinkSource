@@ -66,6 +66,10 @@ def run(run_obj):
     if len(run_obj.target_prots) != len(run_obj.net_obj.nodes):
         print("\tstoring scores for only %d target prots" % (len(run_obj.target_prots)))
 
+    # only set this for per species time analysis
+    alg_name = "%s%s" % (alg, run_obj.params_str)
+    params_results["%s_wall_time"%alg_name] = 0
+    params_results["%s_process_time"%alg_name] = 0
     # run GeneMANIA on each GO term individually
     for goid in tqdm(run_obj.goids_to_run):
         idx = run_obj.ann_obj.goid2idx[goid]
@@ -102,6 +106,10 @@ def run(run_obj):
         params_results["%s_wall_time"%alg_name] += wall_time
         params_results["%s_process_time"%alg_name] += process_time
 
+    run_obj.wall_time = params_results["%s_wall_time"%alg_name]
+    run_obj.process_time = params_results["%s_process_time"%alg_name]
+
+    print("Time taken for this taxon: {}".format(run_obj.process_time))
     run_obj.goid_scores = goid_scores
     run_obj.params_results = params_results
     return

@@ -241,6 +241,28 @@ def compute_fmax(prec, rec, fmax_idx=False):
         return max(f_measures)
 
 
+def compute_fmax_ratio(prec, rec):
+    
+    print(rec)
+    print(prec)
+
+    print(rec[-1])
+    print(prec[-1])
+
+    final_recall = rec[-1]
+    final_precision = prec[-1]
+
+    random_predictor = (2*final_precision*final_recall)/(final_precision+final_recall)
+
+    fmax = compute_fmax(prec, rec)
+
+    fmax_ratio = fmax/random_predictor
+
+    return fmax_ratio
+
+
+
+
 def compute_avgp(prec, rec):
     # average precision score
     # see http://scikit-learn.org/stable/modules/generated/sklearn.metrics.average_precision_score.html#sklearn.metrics.average_precision_score

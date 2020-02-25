@@ -97,6 +97,7 @@ def run(run_obj):
     # a value of 1 would be only upwards, while 0 would be downwards
     dH = (br_lambda * hierarchy_mat) + ((1-br_lambda) * hierarchy_mat.T) 
 
+    params_results["%s_process_time"%alg] = 0
     if alg == 'birgrank':
         theta, mu = params['theta'], params['mu']
         alpha, eps, max_iters = params['alpha'], float(params['eps']), params['max_iters']
@@ -124,7 +125,8 @@ def run(run_obj):
     # also keep track of the time it takes for each of the parameter sets
     #params_results["%s_wall_time"%alg] += wall_time
     params_results["%s_process_time"%alg] += process_time
-
+    
+    run_obj,process_time = process_time
     # limit the scores matrix to only the GOIDs for which we want the scores
     if len(run_obj.goids_to_run) < goid_scores.shape[0]:
         for goid in run_obj.goids_to_run:

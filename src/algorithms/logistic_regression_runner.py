@@ -17,6 +17,9 @@ import seaborn as sns
 import src.algorithms.alg_utils as alg_utils
 import matplotlib.pyplot as plt
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.linear_model import LogisticRegression
+import time
+
 
 def setupInputs(run_obj):
     run_obj.ann_matrix = run_obj.ann_obj.ann_matrix
@@ -24,11 +27,7 @@ def setupInputs(run_obj):
     run_obj.prots = run_obj.ann_obj.prots
     run_obj.hpoidx = run_obj.ann_obj.goid2idx
     run_obj.protidx = run_obj.ann_obj.node2idx
-    #run_obj.net_mat = run_obj.net_obj.W
-    run_obj.P = alg_utils.normalizeGraphEdgeWeights(run_obj.net_obj.W, ss_lambda=run_obj.params.get('lambda', None))
-
-    run_obj.net_mat = run_obj.P
-
+    run_obj.net_mat = run_obj.net_obj.W
     return
 
 def setup_params_str(weight_str, params, name):
@@ -40,18 +39,22 @@ def setupOutputs(run_obj):
 def run(run_obj):
     
     # get the labels matrix and transpose it to have label names as columns
+    start = time.process_time()
+    
+    
     ann_mat = run_obj.ann_matrix
     labels = ann_mat.transpose()    # genes x hpo
-    #print(labels.shape)
 
-    # get the feature vectors of the samples and check the size
+    # get the feature vectors of the samples and check the size #genes x #genes
     feats = run_obj.net_mat
     #print(feats.shape)
     
     
     train_mat = run_obj.train_mat
     test_mat = run_obj.test_mat
-
+    
+    #print(test_mat)
+    print(train_mat.shape, test_mat.shape)
     '''
     test_set = set()
     
@@ -92,67 +95,56 @@ def run(run_obj):
     
     '''
 
-    # first just try multiclass classification with the first label
     scores = sparse.lil_matrix(labels.transpose().shape, dtype=np.float)        #   dim: hpo x genes
     
     combined_scores = sparse.lil_matrix(labels.transpose().shape, dtype=np.float) # dim: hpo x genes terms
     print("Shape of combined scores: {}".format(combined_scores.shape))
     #test_set = list(test_set)
+    
+    #print(labels.shape[1])
     for l in range(labels.shape[1]):
         print("******************working on label........: {}".format(l))
         
         # compute the test gene indices of the annotations for the given label
         
+
         train_pos, train_neg = alg_utils.get_goid_pos_neg(train_mat,l)
         if len(train_pos)==0:
             print("Skipping term, 0 positive examples")
             continue
-        
-        
-        
-        
-        #test_set = set()
+
+        # obtain indices of all samples (genes) that belong to the test set
+        test_set = set()
         test_pos, test_neg = alg_utils.get_goid_pos_neg(test_mat, l)
+         
         
         test_set = set(test_pos) | set(test_neg)
-        
-        #for i in test_pos:
-        #    test_set.add(i)
-        #for i in test_neg:
-        #    test_set.add(i)
-       
-        test_set = sorted(list(test_set))
-        
+        test_set = list(test_set)
+
+        print("Number of elements in test set: {}".format(len(test_set)))
+
         # remove these indices from the training data
+
         X_train = np.delete(feats.toarray(), test_set, 0)
         X_train = sparse.lil_matrix(X_train)
-        print(X_train.shape)
+        print("Training data shape: {}".format(X_train.shape))
 
-        # construct the training set with only these indices
+        # construct the test set with only these indices
+
         X_test = feats.toarray()[test_set]
         X_test = sparse.lil_matrix(X_test)
-        print(X_test.shape)
+        print("Testing data shape: {}" .format(X_test.shape))
 
         # construct the training label data without these indices
 
         y_train = np.delete(train_mat.toarray().transpose(), test_set, 0)
         y_train = sparse.lil_matrix(y_train)
-        print(y_train.shape)
-
-        #test_set = list(test_set)
-        #print(test_set)
-        #print(len(test_set))
-        #test_set = sorted(test_set)
-        #print(len(test_set))
-        # construct the classifier
-        temp = []
         
-        # this (SVC) uses internal 5-FCV when probability option is set to true
-        #clf = SVC(probability=True, verbose=True, gamma='auto', kernel='linear')
-    
-        svm = LinearSVC(max_iter=10000, loss='hinge')
-        clf = CalibratedClassifierCV(svm) 
+        print("Training label shape: {}".format(y_train.shape))
 
+        temp = []
+        clf =  LogisticRegression(max_iter=5000)
+        
         # get the column of training data for the given label 
         lab = y_train[:,l].toarray().flatten()
 
@@ -162,14 +154,13 @@ def run(run_obj):
         print(clf.classes_)
         
         # make predictions on the constructed training set
-            
+
         print("Predicting")
         predict = clf.predict_proba(X_test.toarray())[:,2]
         
-        predict = predict.tolist()
-        
         print(predict)
-        
+
+        predict = predict.tolist()
         print("Length of the predicted array : {}".format(len(predict)))
         
 
@@ -186,10 +177,10 @@ def run(run_obj):
         scores[int(l)] = curr_score
         #break
 
-    print(scores.shape)
+    #print(scores.shape)
+    
     run_obj.goid_scores = scores
     print("Number of non-zero values in the scores matrix: %s" %run_obj.goid_scores.count_nonzero())
-    print("Shape of scores matrix after this fold: {}".format(run_obj.goid_scores.shape))
-
+    print("Time taken this fold: {}".format(time.process_time() - start))
+    #print("Shape of scores matrix after this fold: %s" %run_obj.goid_scores.shape)
     print(run_obj.goid_scores)
-    #print(scores)

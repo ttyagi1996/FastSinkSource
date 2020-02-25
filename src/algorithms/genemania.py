@@ -36,6 +36,8 @@ def runGeneMANIA(L, y, tol=1e-05, verbose=False):
     #num_neg = len((y < 0).nonzero()[1])
     num_pos = len(np.where(y == 1)[0])
     num_neg = len(np.where(y == -1)[0])
+    
+    print("Positive annotations: {}, negative annotations: {}".format(num_pos, num_neg))
     if num_pos == 0:
         print("WARNING: No positive examples given. Skipping.")
         return np.zeros(len(y)), 0,0,0

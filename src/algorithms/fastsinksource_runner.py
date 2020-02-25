@@ -5,7 +5,8 @@ import src.algorithms.alg_utils as alg_utils
 from tqdm import tqdm, trange
 from scipy import sparse as sp
 import numpy as np
-
+from numpy import load
+import pandas as pd
 
 def setupInputs(run_obj):
     # may need to make sure the inputs match
@@ -24,11 +25,13 @@ def setupInputs(run_obj):
         W, process_time = run_obj.net_obj.weight_SWSN(run_obj.ann_matrix)
         run_obj.P = alg_utils.normalizeGraphEdgeWeights(W, ss_lambda=run_obj.params.get('lambda', None))
         run_obj.params_results['%s_weight_time'%(run_obj.name)] += process_time
+        run_obj.W = W
     elif run_obj.net_obj.weight_gmw:
         # this will be handled on a GO term by GO term basis
         run_obj.P = None
     else:
         run_obj.P = alg_utils.normalizeGraphEdgeWeights(run_obj.net_obj.W, ss_lambda=run_obj.params.get('lambda', None))
+        run_obj.W = run_obj.net_obj.W
 
     return
 
@@ -65,6 +68,94 @@ def run(run_obj):
     *goids_to_run*: goids for which to run the method. 
         Must be a subset of the goids present in the ann_obj
     """
+    #print(len(run_obj.goids_to_run), run_obj.fold_num)
+
+    """
+    out_file = 'fold_{}-STRING_2017_10-SWSN.csv.gz'.format(run_obj.fold_num)
+    df = pd.DataFrame(columns=['gene1', 'gene2', 'weight'])
+    
+    W = run_obj.P
+    W = sp.triu(W, k=1)
+    W = W.tocsr()
+    print(W[0][0])
+    W = W.todense()
+    for i in trange(W.shape[0]):
+        edges = W[i,:]
+        edge_list = (edges>0).nonzero()[1]
+        
+        for j in edge_list:
+            edge = [run_obj.ann_obj.prots[i], run_obj.ann_obj.prots[j], W[i,j]]
+            print(edge)
+            df.loc[len(df)] = edge
+
+
+    df.to_csv(out_file, sep='\t', index=False, compression='gzip')
+
+    
+    """
+
+
+
+    #out_file = 'STRING_2017_10-SWSN.npz'
+    #sp.save_npz(out_file, run_obj.W);
+    """
+    df = pd.DataFrame(columns=['hpoid', 'pos/neg/unknown', 'proteins'])
+
+    stri_pos = ""
+    stri_neg = ""
+    stri_unknown = ""
+    outfile = 'ALL_3320HPO_pos-neg-O-list.tsv'
+    
+    #lines = []
+    #with open(outfile, "a") as f:
+    for i in trange(run_obj.ann_matrix.shape[0]):
+        ann = run_obj.ann_matrix[i,:]
+        pos = (ann > 0 ).nonzero()[1]
+        neg = (ann< 0).nonzero()[1]
+        un = (ann == 0).nonzero()[1]
+        stri_pos += str(run_obj.goids[i])+'\t'
+        stri_pos += '1\t'
+    
+        stri_neg += str(run_obj.goids[i])+'\t'
+        stri_neg += '-1\t'
+        
+        stri_unknown += str(run_obj.goids[i])+'\t'
+        stri_unknown += '0\t'
+
+        pos = [run_obj.ann_obj.prots[j] for j in pos]
+        neg = [run_obj.ann_obj.prots[j] for j in neg]
+        unknown = [run_obj.ann_obj.prots[j] for j in un]
+
+        stri_pos += ",".join(pos)
+        stri_neg += ",".join(neg)
+        stri_unknown += ",".join(unknown)
+
+        #f.write(stri_pos)
+        #f.write('\n')
+        #f.write(stri_neg)
+        #f.write('\n')
+        #f.write(stri_unknown)
+        #f.write('\n')
+
+        #lines.append(stri_pos)
+        #lines.append(stri_neg)
+        #lines.append(stri_unknown)
+         
+        df.loc[len(df)] = [run_obj.goids[i], "1", ",".join(pos)] 
+        df.loc[len(df)] = [run_obj.goids[i], "-1", ",".join(neg)] 
+        df.loc[len(df)] = [run_obj.goids[i], "0", ",".join(unknown)] 
+        print(len(pos) + len(neg) + len(unknown))
+        
+        print(df.shape)
+        #break
+
+    df.to_csv(outfile, sep='\t', index=False)
+
+
+
+    """
+
+    
     params_results = run_obj.params_results
     P, alg, params = run_obj.P, run_obj.name, run_obj.params
     # make sure the goid_scores matrix is reset
@@ -98,7 +189,8 @@ def run(run_obj):
         if alg in ["fastsinksource", "fastsinksourceplus", "sinksource", "sinksourceplus"]:
             a, eps, max_iters = params['alpha'], float(params['eps']), params['max_iters']
             scores, process_time, wall_time, iters = fastsinksource.runFastSinkSource(
-                P, positives, negatives=negatives, max_iters=max_iters, eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False))
+                P, positives, negatives=negatives, max_iters=max_iters,
+                eps=eps, a=a, verbose=run_obj.kwargs.get('verbose', False))
         elif alg in ["local", "localplus"]:
             scores, process_time, wall_time = fastsinksource.runLocal(
                 P, positives, negatives=negatives)
@@ -127,6 +219,7 @@ def run(run_obj):
 
     run_obj.goid_scores = goid_scores
     run_obj.params_results = params_results
+    
     return
 
 
