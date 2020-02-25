@@ -16,10 +16,10 @@ ALL_EVIDENCE_CODES = ['EXP','IDA','IPI','IMP','IGI','IEP','ISS','ISO','ISA','ISM
 go_categories = {'cellular_component': 'C', 'biological_process': 'P', 'molecular_function' : 'F'}
 
 
-<<<<<<< HEAD
+
 def parse_obo_file_and_build_dags(obo_file, 
         categories=go_categories, master_root=None):
-=======
+    return
 
 def parse_args(args):
     ## Parse command line args.
@@ -88,7 +88,6 @@ and the columns are GO term IDs. Also writes a summary statistics table
 
 
 def parse_obo_file_and_build_dags(obo_file, forced=False):
->>>>>>> origin/master
     """
     Parse the GO OBO into a networkx MultiDiGraph using obonet.
     Then construct a DAG for each category using the 'is_a' relationships 

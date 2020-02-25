@@ -249,9 +249,7 @@ def load_annotations(prots, dataset, input_dir, **kwargs):
     selected_terms = alg_utils.select_goterms(
             only_functions_file=only_functions_file, goterms=kwargs['goterm']) 
 
-<<<<<<< HEAD
-    print(selected_terms)
-=======
+
     # write/load the processed annotation matrix in a pos_neg_file version of the network folder
     # TODO this is hacky, but works for now
     pos_neg_str = dataset['pos_neg_file'] \
@@ -259,7 +257,7 @@ def load_annotations(prots, dataset, input_dir, **kwargs):
                        .replace('.txt','').replace('.tsv','').replace('.gz','')
     pos_neg_str += '-Yneg' if kwargs.get('youngs_neg') else ''
     sparse_ann_file = "%s/%s/sparse-anns/%s.npz" % (input_dir, dataset['net_version'], pos_neg_str)
->>>>>>> origin/master
+
     # now build the annotation matrix
     pos_neg_file = "%s/%s" % (input_dir, dataset['pos_neg_file'])
     obo_file = "%s/%s" % (input_dir, dataset['obo_file'])
@@ -294,10 +292,9 @@ def load_annotations(prots, dataset, input_dir, **kwargs):
                 obo_file, pos_neg_file_eval, sparse_ann_file, prots, **kwargs)
         # also limit the terms in the eval_ann_obj to those from the pos_neg_file
         eval_ann_obj.limit_to_terms(selected_terms)
-<<<<<<< HEAD
+
         eval_ann_obj.reshape_to_prots(prots)
-=======
->>>>>>> origin/master
+
     ann_obj.selected_terms = selected_terms
     return selected_terms, ann_obj, eval_ann_obj
 
