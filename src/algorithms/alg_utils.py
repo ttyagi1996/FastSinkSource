@@ -179,6 +179,18 @@ def normalizeGraphEdgeWeights(W, ss_lambda=None, axis=1):
     return P.asformat(W.getformat())
 
 
+def influenceMatrix(W, ss_lambda=None, alpha=0.85):
+    degree_weighted = normalizeGraphEdgeWeights(W, ss_lambda, axis=0)
+    print('Setting up influence matrix')
+    influence_mat = alpha * sp.linalg.inv(sp.identity(W.shape[0]) - (1-alpha)*degree_weighted)
+    print(W.getformat())
+    #return influence_mat.asformat(W.getformat())
+    influence_mat = sp.csr_matrix(influence_mat)
+    print(influence_mat.shape)
+    return influence_mat
+
+
+
 def _net_normalize(W, axis=0):
     """
     Normalize W by multiplying D^(-1/2) * W * D^(-1/2)
