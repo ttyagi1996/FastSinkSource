@@ -140,15 +140,12 @@ def run(run_obj):
 
     # also keep track of the time it takes for each of the parameter sets
     #params_results["%s_wall_time"%alg] += wall_time
-<<<<<<< HEAD
     params_results["%s_process_time"%alg] += process_time
     
     run_obj,process_time = process_time
-=======
     alg_name = "%s%s" % (alg, run_obj.params_str)
     params_results["%s_process_time"%alg_name] += process_time
 
->>>>>>> origin/master
     # limit the scores matrix to only the GOIDs for which we want the scores
     if len(run_obj.goids_to_run) < goid_scores.shape[0]:
         for goid in run_obj.goids_to_run:
