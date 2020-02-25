@@ -1,7 +1,7 @@
 
 import os, sys
 from scipy import sparse as sp
-from scipy.sparse import csr_matrix, csgraph, diags
+from scipy.sparse import csr_matrix, csgraph, diags, csc_matrix
 import numpy as np
 from collections import defaultdict
 import time
@@ -181,7 +181,23 @@ def normalizeGraphEdgeWeights(W, ss_lambda=None, axis=1):
 def influenceMatrix(W, ss_lambda=None, alpha=0.85):
     degree_weighted = normalizeGraphEdgeWeights(W, ss_lambda, axis=0)
     print('Setting up influence matrix')
-    influence_mat = alpha * sp.linalg.inv(sp.identity(W.shape[0]) - (1-alpha)*degree_weighted)
+    
+    print("build identity matrix")
+    identity = sp.identity(W.shape[0])
+
+    print("compute column norm")
+    col_norm = (1-alpha)*degree_weighted
+    
+    print("compute inner term")
+    inner_term = (identity - col_norm).todense()
+
+    print(inner_term.shape)
+    print("compute inverse of inner term")
+    inv = np.linalg.inv(inner_term)
+     
+    print("compute final term")
+    influence_mat = alpha*inv
+    #influence_mat = alpha * sp.linalg.inv(csr_matrix(np.identity(W.shape[0]) - (1-alpha)*degree_weighted)  )
     print(W.getformat())
     #return influence_mat.asformat(W.getformat())
     influence_mat = sp.csr_matrix(influence_mat)
