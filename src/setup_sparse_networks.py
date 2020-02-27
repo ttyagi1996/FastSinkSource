@@ -64,7 +64,7 @@ class Sparse_Networks:
         # make sure the values are correct
         if self.multi_net is True:
             self.weight_swsn = True if weight_method.lower() == 'swsn' else False
-            self.influece_mat = True if matrix_choice.lower() == 'influence' else False
+            self.influence_mat = True if matrix_choice.lower() == 'influence' else False
             self.weight_gmw = True if weight_method.lower() in ['gmw', 'gm2008'] else False
             num_weight_methods = sum([self.weight_swsn, self.weight_gmw])
             if num_weight_methods == 0 or num_weight_methods > 1:

@@ -31,16 +31,19 @@ def setupInputs(run_obj):
     return
 
 def setup_params_str(weight_str, params, name):
-    return
+    return "log_reg-2000iter"
 
 def setupOutputs(run_obj):
     return
 
 def run(run_obj):
     
+
+    params_results = run_obj.params_results
+
+    P, alg, params = run_obj.P, run_obj.name, run_obj.params
     # get the labels matrix and transpose it to have label names as columns
-    start = time.process_time()
-    
+     
     
     ann_mat = run_obj.ann_matrix
     labels = ann_mat.transpose()    # genes x hpo
@@ -54,7 +57,7 @@ def run(run_obj):
     test_mat = run_obj.test_mat
     
     #print(test_mat)
-    print(train_mat.shape, test_mat.shape)
+    #print(train_mat.shape, test_mat.shape)
     '''
     test_set = set()
     
@@ -98,12 +101,12 @@ def run(run_obj):
     scores = sparse.lil_matrix(labels.transpose().shape, dtype=np.float)        #   dim: hpo x genes
     
     combined_scores = sparse.lil_matrix(labels.transpose().shape, dtype=np.float) # dim: hpo x genes terms
-    print("Shape of combined scores: {}".format(combined_scores.shape))
+    #print("Shape of combined scores: {}".format(combined_scores.shape))
     #test_set = list(test_set)
     
     #print(labels.shape[1])
-    for l in range(labels.shape[1]):
-        print("******************working on label........: {}".format(l))
+    for l in tqdm(range(labels.shape[1])):
+        #print("******************working on label........: {}".format(l))
         
         # compute the test gene indices of the annotations for the given label
         
@@ -121,47 +124,51 @@ def run(run_obj):
         test_set = set(test_pos) | set(test_neg)
         test_set = list(test_set)
 
-        print("Number of elements in test set: {}".format(len(test_set)))
+        #print("Number of elements in test set: {}".format(len(test_set)))
 
         # remove these indices from the training data
 
         X_train = np.delete(feats.toarray(), test_set, 0)
         X_train = sparse.lil_matrix(X_train)
-        print("Training data shape: {}".format(X_train.shape))
+        #print("Training data shape: {}".format(X_train.shape))
 
         # construct the test set with only these indices
 
         X_test = feats.toarray()[test_set]
         X_test = sparse.lil_matrix(X_test)
-        print("Testing data shape: {}" .format(X_test.shape))
+        #print("Testing data shape: {}" .format(X_test.shape))
 
         # construct the training label data without these indices
 
         y_train = np.delete(train_mat.toarray().transpose(), test_set, 0)
         y_train = sparse.lil_matrix(y_train)
         
-        print("Training label shape: {}".format(y_train.shape))
+        #print("Training label shape: {}".format(y_train.shape))
 
         temp = []
-        clf =  LogisticRegression(max_iter=5000)
+        clf =  LogisticRegression(max_iter=2000)
         
         # get the column of training data for the given label 
         lab = y_train[:,l].toarray().flatten()
 
         # now train the model on the constructed training data and the column of labels
-        print("Training")
+        #print("Training")
+
+        process_time = time.process_time()
+
         clf.fit(X_train.toarray(), lab)
-        print(clf.classes_)
+        #print(clf.classes_)
         
         # make predictions on the constructed training set
 
-        print("Predicting")
+        #print("Predicting")
         predict = clf.predict_proba(X_test.toarray())[:,2]
         
-        print(predict)
+        process_time = time.process_time() - process_time
+        #print(predict)
 
         predict = predict.tolist()
-        print("Length of the predicted array : {}".format(len(predict)))
+        #print("Length of the predicted array : {}".format(len(predict)))
         
 
         # get the current scores for the given label l
@@ -175,12 +182,21 @@ def run(run_obj):
 
         # add the scores produced by predicting on the current label of test set to a combined score matrix
         scores[int(l)] = curr_score
+
+
+        # keep track of the running time per term and add it to the total running time
+
+        alg_name = "%s%s" % (alg, run_obj.params_str)
+        params_results["%s_process_time"%alg_name] += process_time
+
+
         #break
 
     #print(scores.shape)
     
     run_obj.goid_scores = scores
-    print("Number of non-zero values in the scores matrix: %s" %run_obj.goid_scores.count_nonzero())
-    print("Time taken this fold: {}".format(time.process_time() - start))
+    run_obj.params_results = params_results
+    #print("Number of non-zero values in the scores matrix: %s" %run_obj.goid_scores.count_nonzero())
+    #print("Time taken this fold: {}".format(time.process_time() - start))
     #print("Shape of scores matrix after this fold: %s" %run_obj.goid_scores.shape)
-    print(run_obj.goid_scores)
+    #print(run_obj.goid_scores)

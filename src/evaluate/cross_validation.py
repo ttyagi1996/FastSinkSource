@@ -113,13 +113,16 @@ def run_cv_all_goterms(
             out_file = "%s/cv-%dfolds-rep%d%s%s.txt" % (
                 run_obj.out_dir, folds, rep,
                 "-seed%s"%curr_seed if curr_seed is not None else "", run_obj.params_str)
+            alg_name = "%s%s" % (run_obj.name, run_obj.params_str)
+            print("Time taken by {} for 5FCV is: {}".format(run_obj.name, run_obj.params_results["%s_process_time"%alg_name]))
             utils.checkDir(os.path.dirname(out_file)) 
             eval_utils.evaluate_ground_truth(
                 run_obj, ann_obj, out_file,
                 #non_pos_as_neg_eval=opts.non_pos_as_neg_eval,
                 alg=run_obj.name, append=False, **kwargs)
-
+            
     print("Finished running cross-validation")
+    print(run_obj.params_results)
     return
 
 
