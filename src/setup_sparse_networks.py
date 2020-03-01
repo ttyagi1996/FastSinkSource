@@ -76,10 +76,10 @@ class Sparse_Networks:
             self.weight_gmw = False
 
         # set a weight str for writing output files
-        self.weight_str = '%s%s%s' % (
+        self.weight_str = '%s%s%s%s' % (
             '-unw' if self.unweighted else '', 
             '-gmw' if self.weight_gmw else '',
-            '-swsn' if self.weight_swsn else ''
+            '-swsn' if self.weight_swsn else '',
             '-influence' if self.influence_mat else '-adjacency')
 
         if self.unweighted is True:

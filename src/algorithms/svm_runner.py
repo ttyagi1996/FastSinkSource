@@ -28,14 +28,31 @@ def setupInputs(run_obj):
     run_obj.hpoidx = run_obj.ann_obj.goid2idx
     run_obj.protidx = run_obj.ann_obj.node2idx
     #run_obj.net_mat = run_obj.net_obj.W
-    run_obj.P = alg_utils.normalizeGraphEdgeWeights(run_obj.net_obj.W, ss_lambda=run_obj.params.get('lambda', None))
+    # if swsn weighting is to be used, then obtain the current fold W
+    if run_obj.net_obj.weight_swsn:
+        print("Obtaining W from SWSN")
+        W, process_time = run_obj.net_obj.weight_SWSN(run_obj.ann_matrix)
+        run_obj.params_results['%s_weight_time'%(run_obj.name)] += process_time
+    else:
+        print("W set without any weighting")
+        W = run_obj.net_obj.W
+    
+    # if influence matrix is to be used, then obtain the influence matrix of W
+    if run_obj.net_obj.influence_mat:
+        print("Setting up influence matrix")
+        W = alg_utils.influenceMatrix(W, ss_lambda=run_obj.params.get('lambda', None))
+    
+    # finally, normalize the edge weights of the W matrix.
+    print("Normalizing adjacency matrix")
+    run_obj.P = alg_utils.normalizeGraphEdgeWeights(W, ss_lambda=run_obj.params.get('lambda', None))
+    #run_obj.P = alg_utils.normalizeGraphEdgeWeights(run_obj.net_obj.W, ss_lambda=run_obj.params.get('lambda', None))
 
     run_obj.net_mat = run_obj.P
 
     return
 
 def setup_params_str(weight_str, params, name):
-    return "linear_svm-2000ter"
+    return "-linear_svm-2000ter"
 
 def setupOutputs(run_obj):
     return
@@ -84,22 +101,32 @@ def run(run_obj):
         test_set = sorted(list(test_set))
         
         #print(run_obj.protidx.values())
-        train_set = sorted(list(set(run_obj.protidx.values()) - set(test_set)))
-                
+        #train_set = sorted(list(set(run_obj.protidx.values()) - set(test_set)))
+         
+        train_set = sorted(list(set(train_pos)|set(train_neg)))
+
         X_train = feats[train_set, :]
         X_test = feats[test_set]
         #print(X_test.shape)
         # construct the training label data without these indices
 
-        y_train = np.delete(train_mat.toarray().transpose(), test_set, 0)
-        y_train = sparse.lil_matrix(y_train)
+        #y_train = np.delete(train_mat.toarray().transpose(), test_set, 0)
+        #y_train = sparse.lil_matrix(y_train)
+        
+        #print(train_mat.shape)
+        y_train = train_mat.transpose()[train_set, :]
+    
+        y_train = sparse.lil_matrix(y_train) 
         temp = []
         
+        #print(X_train.shape)
+        #print(y_train.shape)
+
         # this (SVC) uses internal 5-FCV when probability option is set to true
-        #clf = SVC(probability=True, verbose=True, gamma='auto', kernel='linear')
-    
+        #clf = SVC(probability=True, kernel='linear', max_iter=2000)
+         
         svm = LinearSVC(max_iter=2000)
-        clf = CalibratedClassifierCV(svm) 
+        clf = CalibratedClassifierCV(svm, cv=3) 
 
         # get the column of training data for the given label 
         lab = y_train[:,l].toarray().flatten()
@@ -108,13 +135,14 @@ def run(run_obj):
         
         #print("Training")
 
-        clf.fit(X_train.toarray(), lab)
+        process_time = time.process_time()
+        clf.fit(X_train, lab)
         #print(clf.classes_)
         
-        process_time = time.process_time()
+        #process_time = time.process_time()
         # make predictions on the constructed training set
         #print("Predicting")
-        predict = clf.predict_proba(X_test.toarray())[:,2]
+        predict = clf.predict_proba(X_test)[:,1]
 
         process_time = time.process_time() - process_time
         predict = predict.tolist()
